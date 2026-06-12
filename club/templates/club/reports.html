@@ -1,0 +1,99 @@
+{% extends "club/base.html" %}
+
+{% block title %}Отчеты{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Аналитика</p>
+        <h1>Отчеты</h1>
+    </div>
+</header>
+
+<section class="stats-grid">
+    <article class="stat"><span>Всего клиентов</span><strong>{{ metrics.total_clients }}</strong></article>
+    <article class="stat"><span>Активных клиентов</span><strong>{{ metrics.active_clients }}</strong></article>
+    <article class="stat"><span>Активны за 30 дней</span><strong>{{ metrics.active_period_clients }}</strong></article>
+    <article class="stat"><span>В зоне риска</span><strong>{{ risk_clients|length }}</strong></article>
+</section>
+
+<section class="panel">
+    <div class="panel-head"><h2>Активные клиенты</h2></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ФИО</th><th>Тренер</th><th>Тренировок</th><th>Последняя тренировка</th><th>Абонемент</th></tr></thead>
+            <tbody>
+            {% for client in active_clients %}
+                <tr>
+                    <td><a href="{% url 'client_detail' client.id %}">{{ client.full_name }}</a></td>
+                    <td>{{ client.trainer|default:"-" }}</td>
+                    <td>{{ client.workouts_count }}</td>
+                    <td>{{ client.last_activity_at|date:"d.m.Y H:i" }}</td>
+                    <td>{% with membership=client.current_membership %}{% if membership %}{{ membership.get_status_display }}{% else %}-{% endif %}{% endwith %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">Нет активных клиентов за период.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head"><h2>Клиенты с риском ухода</h2></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ФИО</th><th>Телефон</th><th>Тренер</th><th>Последняя тренировка</th><th>Окончание</th><th>Причина</th></tr></thead>
+            <tbody>
+            {% for row in risk_clients %}
+                <tr>
+                    <td><a href="{% url 'client_detail' row.client.id %}">{{ row.client.full_name }}</a></td>
+                    <td>{{ row.client.phone|default:"-" }}</td>
+                    <td>{{ row.client.trainer|default:"-" }}</td>
+                    <td>{{ row.last|date:"d.m.Y H:i"|default:"нет" }}</td>
+                    <td>{% if row.membership %}{{ row.membership.end_date|date:"d.m.Y" }}{% else %}-{% endif %}</td>
+                    <td>{{ row.reason }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty">Клиентов с риском ухода нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="dashboard-grid">
+    <article class="panel">
+        <div class="panel-head"><h2>Загрузка тренеров</h2></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Тренер</th><th>Специализация</th><th>Клиентов</th><th>Активных</th><th>Низкая активность</th></tr></thead>
+                <tbody>
+                {% for row in trainer_load %}
+                    <tr>
+                        <td>{{ row.trainer.full_name }}</td>
+                        <td>{{ row.trainer.specialization }}</td>
+                        <td>{{ row.clients_count }}</td>
+                        <td>{{ row.active_count }}</td>
+                        <td>{{ row.low_activity_count }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="empty">Нет данных.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head"><h2>Популярные цели</h2></div>
+        <ul class="plain-list metric-list">
+            {% for row in goal_stats %}
+                <li><span>{{ row.goal }}</span><strong>{{ row.count }}</strong></li>
+            {% empty %}
+                <li class="muted">Нет данных.</li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+{% endblock %}

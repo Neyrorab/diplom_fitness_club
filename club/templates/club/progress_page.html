@@ -1,0 +1,301 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Прогресс{% endblock %}
+
+{% block content %}
+<header class="profile-hero progress-hero">
+    <div class="profile-hero-main">
+        <span class="avatar avatar-xl {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+        <div>
+            <p class="eyebrow">Физические показатели</p>
+            <h1>{{ client.full_name }}</h1>
+            <div class="hero-pills">
+                <span>{{ records|length }} записей</span>
+                <span>{{ client.get_goal_display }}</span>
+                <span>{{ client.training_level|default:"уровень не указан" }}</span>
+            </div>
+        </div>
+    </div>
+    <img class="profile-hero-image" src="{% static 'club/media/progress-checkin.svg' %}" alt="">
+    <a class="btn" href="{% url 'client_detail' client.id %}?tab=progress">К карточке</a>
+</header>
+
+<section class="chart-period-toolbar">
+    <div>
+        <h2>Период графиков</h2>
+        <p class="muted">Вес, замеры и тоннаж показаны за {{ client_chart_period_label }}.</p>
+    </div>
+    <form method="get" class="inline-action-form chart-period-form">
+        <label class="ai-provider-picker">
+            <span>Период</span>
+            <select name="chart_period" aria-label="Период графиков">
+                {% for option in client_chart_period_options %}
+                    <option value="{{ option.value }}" {% if option.value == client_chart_period %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="btn btn-primary" type="submit">Показать</button>
+    </form>
+</section>
+
+<section class="split-layout progress-layout">
+    <article class="panel progress-measurements-panel">
+        <div class="panel-head"><h2>Динамика веса</h2></div>
+        <canvas class="chart tall" id="weightChart" height="240"></canvas>
+        <div class="table-wrap progress-records-table measurement-table-wrap">
+            <table>
+                <thead><tr><th>Дата</th><th>Вес</th><th>Талия</th><th>Грудь</th><th>Бедра</th><th>Комментарий</th><th></th></tr></thead>
+                <tbody>
+                {% for record in records %}
+                    <tr>
+                        <td>{{ record.record_date|date:"d.m.Y" }}</td>
+                        <td>{{ record.weight }}</td>
+                        <td>{{ record.waist|default:"-" }}</td>
+                        <td>{{ record.chest|default:"-" }}</td>
+                        <td>{{ record.hips|default:"-" }}</td>
+                        <td>{{ record.comment|default:"-" }}</td>
+                        <td>
+                            <form method="post" action="{% url 'progress_record_delete' record.id %}" class="inline-action-form">
+                                {% csrf_token %}
+                                <button class="btn btn-small" type="submit">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty">Записей нет.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <aside class="panel">
+        <img class="panel-media" src="{% static 'club/media/progress-checkin.svg' %}" alt="">
+        <div class="panel-head"><h2>Новая запись</h2></div>
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {% for field in form %}
+                <label>
+                    <span>{{ field.label }}</span>
+                    {{ field }}
+                    {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </label>
+            {% endfor %}
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+        </form>
+    </aside>
+</section>
+
+<section id="weight-forecast" class="panel management-ai-panel weight-forecast-panel">
+    <div class="panel-head">
+        <div>
+            <h2>ИИ-прогноз веса</h2>
+            <p class="muted">Провайдер: {{ weight_forecast_provider }} · модель: {{ weight_forecast_model }} · источник: история веса, тренировки и питание</p>
+        </div>
+        <form method="post" class="inline-action-form management-ai-action-form" action="{% url 'weight_forecast_analysis_start' client.id %}">
+            {% csrf_token %}
+            <label class="ai-provider-picker">
+                <span>Агрегатор</span>
+                <select name="provider" aria-label="Агрегатор ИИ" {% if not weight_forecast_readiness.can_run %}disabled{% endif %}>
+                    {% for provider in weight_forecast_providers %}
+                        <option value="{{ provider.value }}" {% if provider.value == weight_forecast_selected_provider %}selected{% endif %}>{{ provider.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="ai-provider-picker">
+                <span>Модель</span>
+                <select name="model_tier" aria-label="Профиль модели ИИ" {% if not weight_forecast_readiness.can_run %}disabled{% endif %}>
+                    {% for tier in weight_forecast_model_tiers %}
+                        <option value="{{ tier.value }}" {% if tier.value == weight_forecast_selected_model_tier %}selected{% endif %}>{{ tier.label }} · {{ tier.description }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button class="btn btn-primary" type="submit" {% if not weight_forecast_readiness.can_run %}disabled{% endif %}>Построить прогноз</button>
+        </form>
+    </div>
+
+    {% if not weight_forecast_readiness.can_run %}
+        <div class="signal-grid management-ai-preview">
+            <article class="signal-card signal-warn">
+                <span>Записей веса</span>
+                <strong>{{ weight_forecast_readiness.records_count }}</strong>
+                <small>минимум {{ weight_forecast_readiness.min_records }}</small>
+            </article>
+            <article class="signal-card">
+                <span>Период наблюдений</span>
+                <strong>{{ weight_forecast_readiness.span_days }}</strong>
+                <small>минимум {{ weight_forecast_readiness.min_span_days }} дней</small>
+            </article>
+        </div>
+        <p class="note">Для прогноза нужно больше истории: {{ weight_forecast_readiness.reasons|join:"; " }}.</p>
+    {% elif weight_forecast_analysis and weight_forecast_analysis.is_pending %}
+        <div
+            class="management-ai-loading"
+            data-ai-loading
+            data-status-url="{{ weight_forecast_status_url }}"
+            data-queued-text="Прогноз ждет запуска. История веса сохранена, страницу можно покинуть."
+            data-running-text="Модель строит вероятную траекторию и коридор нижней/верхней границы."
+            data-retry-text="Проверяем статус прогноза. Обновление продолжится автоматически."
+        >
+            <div class="ai-loading-head">
+                <span class="status status-good">{{ weight_forecast_analysis.get_status_display }}</span>
+                <small>задание #{{ weight_forecast_analysis.id }} · {{ weight_forecast_analysis.created_at|date:"d.m.Y H:i" }}</small>
+            </div>
+            <h3>Строим прогноз динамики веса</h3>
+            <p data-ai-status-text>Запрос выполняется в фоне. Когда результат будет готов, страница обновится автоматически.</p>
+            <div class="ai-loading-track" aria-hidden="true"><span></span></div>
+        </div>
+    {% elif weight_forecast %}
+        {% if weight_forecast_error %}
+            <p class="note">{{ weight_forecast_error }}</p>
+        {% endif %}
+        <div class="ai-management-summary">
+            <div class="ai-management-summary-head">
+                <strong>Вероятная динамика</strong>
+                <span class="status status-good">{{ weight_forecast.trend_label|default:"тренд" }} · {{ weight_forecast.confidence|default:"medium" }}</span>
+            </div>
+            <p>{{ weight_forecast.summary }}</p>
+            <span class="status status-muted">{{ weight_forecast.model }}</span>
+        </div>
+        <canvas class="chart tall weight-forecast-chart" data-chart="line" data-chart-key="weightForecast" height="280"></canvas>
+        <div class="dashboard-grid ai-management-grid weight-forecast-details">
+            <article class="mini-card">
+                <h3>Допущения</h3>
+                <ul class="plain-list">
+                    {% for item in weight_forecast.assumptions %}
+                        <li>{{ item }}</li>
+                    {% empty %}
+                        <li class="muted">Модель не указала отдельные допущения.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Риски прогноза</h3>
+                <ul class="plain-list">
+                    {% for item in weight_forecast.risks %}
+                        <li>{{ item }}</li>
+                    {% empty %}
+                        <li class="muted">Модель не выделила отдельные риски.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Что уточнить</h3>
+                <ul class="plain-list">
+                    {% for item in weight_forecast.recommendations %}
+                        <li>{{ item }}</li>
+                    {% empty %}
+                        <li class="muted">Нет дополнительных уточнений.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+        </div>
+    {% elif weight_forecast_error %}
+        <p class="note">{{ weight_forecast_error }}</p>
+    {% else %}
+        <div class="signal-grid management-ai-preview">
+            <article class="signal-card signal-good">
+                <span>Записей веса</span>
+                <strong>{{ weight_forecast_readiness.records_count }}</strong>
+                <small>данных достаточно</small>
+            </article>
+            <article class="signal-card">
+                <span>Период наблюдений</span>
+                <strong>{{ weight_forecast_readiness.span_days }}</strong>
+                <small>дней истории</small>
+            </article>
+            <article class="signal-card signal-warn">
+                <span>Горизонт</span>
+                <strong>8</strong>
+                <small>недель прогноза</small>
+            </article>
+        </div>
+    {% endif %}
+</section>
+
+<section id="training-load" class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Тоннаж тренировок</h2>
+            <p class="muted">Фактическая нагрузка по выполненным упражнениям.</p>
+        </div>
+    </div>
+    <canvas class="chart tall" data-chart="line" data-chart-key="trainingLoad" height="260"></canvas>
+
+    <div class="workout-load-list">
+        {% for row in workout_load_rows %}
+            <details class="load-workout-card">
+                <summary>
+                    <span>
+                        <strong>{{ row.workout.completed_at|date:"d.m.Y" }} · {{ row.workout.workout_day.title }}</strong>
+                        <small>{{ row.workout.workout_day.workout_plan.title }}</small>
+                    </span>
+                    <span class="status status-good">{{ row.total_load|floatformat:1 }} кг</span>
+                </summary>
+                <form method="post" class="stack load-workout-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="workout_load">
+                    <input type="hidden" name="workout_id" value="{{ row.workout.id }}">
+                    <div class="exercise-list">
+                        {% for entry in row.entries %}
+                            {% with item=entry.plan_exercise %}
+                                <article class="exercise-item load-exercise-item">
+                                    <div>
+                                        <h3>{{ item.exercise.name }}</h3>
+                                        <p class="muted">{{ item.sets_count }} x {{ item.reps_count }}, {{ item.recommended_weight }} кг</p>
+                                    </div>
+                                    <label class="checkbox">
+                                        <input type="checkbox" name="exercise_{{ item.id }}_done" {% if entry.is_completed %}checked{% endif %}>
+                                        <span>Выполнено</span>
+                                    </label>
+                                    <label>
+                                        <span>Подходы</span>
+                                        <input type="number" min="0" name="exercise_{{ item.id }}_sets" value="{{ entry.sets }}">
+                                    </label>
+                                    <label>
+                                        <span>Повторы</span>
+                                        <input type="number" min="0" name="exercise_{{ item.id }}_reps" value="{{ entry.reps }}">
+                                    </label>
+                                    <label>
+                                        <span>Вес</span>
+                                        <input type="number" step="0.5" min="0" name="exercise_{{ item.id }}_weight" value="{{ entry.weight|floatformat:1 }}">
+                                    </label>
+                                    <label>
+                                        <span>Комментарий</span>
+                                        <input name="exercise_{{ item.id }}_comment" value="{{ entry.comment }}">
+                                    </label>
+                                </article>
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-primary" type="submit">Сохранить нагрузку</button>
+                    </div>
+                </form>
+                <form method="post" action="{% url 'completed_workout_delete' row.workout.id %}" class="actions">
+                    {% csrf_token %}
+                    <button class="btn" type="submit">Удалить тренировку</button>
+                </form>
+            </details>
+        {% empty %}
+            <p class="empty">Выполненных тренировок пока нет.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.chartData = {
+    labels: {{ progress.labels|safe }},
+    values: {{ progress.weights|safe }}
+};
+window.dashboardCharts = {{ progress_charts|safe }};
+{% if weight_forecast_chart %}
+window.dashboardCharts.weightForecast = {{ weight_forecast_chart|safe }};
+{% endif %}
+</script>
+<script src="{% static 'club/charts.js' %}?v=20260609-connect-sparse-progress"></script>
+<script src="{% static 'club/management_ai.js' %}"></script>
+{% endblock %}

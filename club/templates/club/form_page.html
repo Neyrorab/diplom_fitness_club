@@ -1,0 +1,34 @@
+{% extends "club/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Форма</p>
+        <h1>{{ title }}</h1>
+    </div>
+    <a class="btn" href="{{ back_url }}">Назад</a>
+</header>
+
+<section class="panel form-panel">
+    <form method="post" class="form-grid">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="form-errors wide">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% for field in form %}
+            <label class="{% if field.field.widget.input_type == 'checkbox' %}checkbox{% endif %}">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+            </label>
+        {% endfor %}
+        <div class="wide actions">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+            <a class="btn" href="{{ back_url }}">Отмена</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

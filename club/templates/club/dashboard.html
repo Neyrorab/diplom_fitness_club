@@ -1,0 +1,528 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Кабинет{% endblock %}
+
+{% block content %}
+<header class="club-hero">
+    <div class="club-hero-copy">
+        <p class="eyebrow">Кабинет</p>
+        <h1>
+            {% if is_admin_role %}Пульс фитнес-клуба{% elif is_trainer_role %}Рабочий день тренера{% else %}Личный прогресс в фокусе{% endif %}
+        </h1>
+        <p class="hero-lead">
+            {% if is_admin_role %}
+                Клиенты, абонементы и загрузка тренеров собраны в одном операционном экране.
+            {% elif is_trainer_role %}
+                Быстрый обзор клиентов, последних тренировок и тех, кому стоит написать сегодня.
+            {% else %}
+                Вес, питание, план тренировок и рекомендации рядом, чтобы легче держать темп.
+            {% endif %}
+        </p>
+        <div class="hero-pills">
+            <span>{{ metrics.total_clients }} клиентов</span>
+            <span>{{ metrics.active_period_clients }} активны за 30 дней</span>
+            <span>{{ metrics.expiring_memberships|length }} абонементов истекает</span>
+        </div>
+    </div>
+    <div class="club-hero-media">
+        <img src="{% static 'club/media/studio-hero.png' %}" alt="">
+        <div class="hero-floating-card">
+            <strong>{% if is_client_role %}{{ physical.weight_total_change }}{% else %}{{ metrics.active_clients }}{% endif %}</strong>
+            <span>{% if is_client_role %}динамика веса{% else %}активных клиентов{% endif %}</span>
+        </div>
+    </div>
+    {% if is_admin_role %}
+        <div class="actions">
+            <a class="btn" href="{% url 'admin_dashboards' %}">Дашборды</a>
+            <a class="btn btn-primary" href="{% url 'client_create' %}">Добавить клиента</a>
+        </div>
+    {% elif is_trainer_role %}
+        <div class="actions">
+            <a class="btn btn-primary" href="{% url 'schedule' %}">Открыть расписание</a>
+        </div>
+    {% elif is_client_role %}
+        <div class="actions">
+            <a class="btn btn-primary" href="{% url 'schedule' %}">Записаться на тренировку</a>
+        </div>
+    {% endif %}
+</header>
+
+{% if is_client_role %}
+    <section class="client-metrics">
+        <article class="metric-card metric-card-main">
+            <span>Текущий вес</span>
+            <strong>{% if physical.weight %}{{ physical.weight|floatformat:1 }} кг{% else %}-{% endif %}</strong>
+            <small>За последнюю запись: {{ physical.weight_change }}</small>
+        </article>
+        <article class="metric-card">
+            <span>ИМТ</span>
+            <strong>{% if physical.bmi %}{{ physical.bmi }}{% else %}-{% endif %}</strong>
+            <small>{% if physical.latest_date %}обновлено {{ physical.latest_date|date:"d.m.Y" }}{% else %}нет замеров{% endif %}</small>
+        </article>
+        <article class="metric-card">
+            <span>Талия</span>
+            <strong>{% if physical.waist %}{{ physical.waist|floatformat:1 }} см{% else %}-{% endif %}</strong>
+            <small>{{ physical.waist_change }}</small>
+        </article>
+        <article class="metric-card">
+            <span>Бедра</span>
+            <strong>{% if physical.hips %}{{ physical.hips|floatformat:1 }} см{% else %}-{% endif %}</strong>
+            <small>{{ physical.hips_change }}</small>
+        </article>
+    </section>
+
+    <section class="chart-period-toolbar">
+        <div>
+            <h2>Графики за период</h2>
+            <p class="muted">Сейчас показано: {{ client_chart_period_label }}.</p>
+        </div>
+        <form method="get" class="inline-action-form chart-period-form">
+            <label class="ai-provider-picker">
+                <span>Период</span>
+                <select name="chart_period" aria-label="Период графиков">
+                    {% for option in client_chart_period_options %}
+                        <option value="{{ option.value }}" {% if option.value == client_chart_period %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Показать</button>
+        </form>
+    </section>
+
+    <section class="client-chart-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Динамика веса</h2>
+                <span class="status status-good">{{ physical.weight_total_change }}</span>
+            </div>
+            <canvas class="chart compact-chart" data-chart="line" data-chart-key="clientWeight" height="190"></canvas>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Замеры тела</h2>
+                <span class="status status-muted">талия · грудь · бедра</span>
+            </div>
+            <canvas class="chart compact-chart" data-chart="line" data-chart-key="clientMeasurements" height="190"></canvas>
+        </article>
+    </section>
+
+    <section class="client-chart-grid client-training-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Регулярность тренировок</h2>
+                <span class="status status-muted">{{ client_chart_period_label }}</span>
+            </div>
+            <canvas class="chart compact-chart" data-chart="groupedBar" data-chart-key="workoutRegularity" height="210"></canvas>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Календарь активности</h2>
+                <span class="status status-muted">{{ client_chart_period_label }}</span>
+            </div>
+            <canvas class="chart compact-chart" data-chart="heatmap" data-chart-key="activityCalendar" height="210"></canvas>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Выполнение плана</h2>
+                {% if plan %}<span class="status status-good">{{ plan.completion_percent }}%</span>{% else %}<span class="status status-muted">нет плана</span>{% endif %}
+            </div>
+            <canvas class="chart compact-chart" data-chart="donut" data-chart-key="planCompletion" height="210"></canvas>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Объем нагрузки</h2>
+                <span class="status status-muted">тоннаж</span>
+            </div>
+            <canvas class="chart compact-chart" data-chart="line" data-chart-key="trainingLoad" height="210"></canvas>
+        </article>
+    </section>
+{% else %}
+    <section class="stats-grid">
+        <article class="stat">
+            <span>Клиентов</span>
+            <strong>{{ metrics.total_clients }}</strong>
+        </article>
+        <article class="stat">
+            <span>Активных</span>
+            <strong>{{ metrics.active_clients }}</strong>
+        </article>
+        <article class="stat">
+            <span>Тренировались за 30 дней</span>
+            <strong>{{ metrics.active_period_clients }}</strong>
+        </article>
+        <article class="stat">
+            <span>Истекают абонементы</span>
+            <strong>{{ metrics.expiring_memberships|length }}</strong>
+        </article>
+    </section>
+{% endif %}
+
+{% if is_client_role %}
+    <section class="dashboard-grid">
+        <article class="panel ai-panel">
+            <div class="panel-head">
+                <h2>ИИ-рекомендации</h2>
+                <a class="btn btn-small" href="{% url 'recommendations' %}">Открыть</a>
+            </div>
+            <div class="ai-score">
+                <strong>{{ ai_recommendations.score }}</strong>
+                <span>индекс сопровождения</span>
+            </div>
+            {% with item=ai_recommendations.items.0 %}
+                {% if item %}
+                    <div class="recommendation-preview priority-{{ item.priority }}">
+                        <span>{{ item.category }}</span>
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.action }}</p>
+                    </div>
+                {% endif %}
+            {% endwith %}
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <div class="person-cell">
+                    <span class="avatar {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+                    <span>
+                        <h2>{{ client.full_name }}</h2>
+                        <small>{{ client.get_goal_display }}</small>
+                    </span>
+                </div>
+                <a class="btn btn-small" href="{% url 'client_detail' client.id %}">Карточка</a>
+            </div>
+            <dl class="info-list">
+                <div><dt>Цель</dt><dd>{{ client.get_goal_display }}</dd></div>
+                <div><dt>Тренер</dt><dd>{{ client.trainer|default:"не назначен" }}</dd></div>
+                <div><dt>Абонемент</dt><dd>{% if membership %}{{ membership.type }} до {{ membership.end_date|date:"d.m.Y" }}{% else %}нет{% endif %}</dd></div>
+            </dl>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Текущий план</h2>
+                {% if plan %}<a class="btn btn-small" href="{% url 'workout_plan_detail' plan.id %}">Открыть</a>{% endif %}
+            </div>
+            {% if plan %}
+                <p class="muted">{{ plan.title }} · {{ plan.completion_percent }}%</p>
+                <div class="progress"><span style="width: {{ plan.completion_percent }}%"></span></div>
+            {% else %}
+                <p class="muted">План не назначен.</p>
+            {% endif %}
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Питание сегодня</h2>
+                <a class="btn btn-small" href="{% url 'nutrition' %}">Открыть</a>
+            </div>
+            <div class="macro-row">
+                <span>{{ nutrition.totals.calories|floatformat:0 }} ккал</span>
+                <span class="macro-protein">Б {{ nutrition.totals.protein|floatformat:0 }}</span>
+                <span class="macro-fat">Ж {{ nutrition.totals.fat|floatformat:0 }}</span>
+                <span class="macro-carbs">У {{ nutrition.totals.carbs|floatformat:0 }}</span>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Комментарии</h2>
+            </div>
+            <ul class="plain-list">
+                {% for comment in comments %}
+                    <li>{{ comment.text }} <small>{{ comment.created_at|date:"d.m.Y" }}</small></li>
+                {% empty %}
+                    <li class="muted">Комментариев пока нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </section>
+{% elif is_trainer_role %}
+    <section id="trainer-ai" class="panel management-ai-panel trainer-ai-panel">
+        <div class="panel-head">
+            <div>
+                <h2>ИИ-ассистент тренера</h2>
+                <p class="muted">Провайдер: {{ trainer_ai_provider }} · модель: {{ trainer_ai_model }} · источник: клиенты и планы тренера</p>
+            </div>
+            <form method="post" class="inline-action-form management-ai-action-form" action="{% url 'trainer_ai_analysis_start' %}">
+                {% csrf_token %}
+                <label class="ai-provider-picker">
+                    <span>Агрегатор</span>
+                    <select name="provider" aria-label="Агрегатор ИИ">
+                        {% for provider in trainer_ai_providers %}
+                            <option value="{{ provider.value }}" {% if provider.value == trainer_ai_selected_provider %}selected{% endif %}>{{ provider.label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="ai-provider-picker">
+                    <span>Модель</span>
+                    <select name="model_tier" aria-label="Профиль модели ИИ">
+                        {% for tier in trainer_ai_model_tiers %}
+                            <option value="{{ tier.value }}" {% if tier.value == trainer_ai_selected_model_tier %}selected{% endif %}>{{ tier.label }} · {{ tier.description }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button class="btn btn-primary" type="submit">Сформировать план тренера</button>
+            </form>
+        </div>
+
+        {% if trainer_ai_analysis and trainer_ai_analysis.is_pending %}
+            <div
+                class="management-ai-loading"
+                data-ai-loading
+                data-status-url="{{ trainer_ai_analysis_status_url }}"
+                data-queued-text="Задание ждет запуска. Данные клиентов сохранены, страницу можно покинуть."
+                data-running-text="Модель анализирует клиентов, планы, регулярность и абонементы."
+                data-retry-text="Проверяем статус фонового анализа. Обновление продолжится автоматически."
+            >
+                <div class="ai-loading-head">
+                    <span class="status status-good">{{ trainer_ai_analysis.get_status_display }}</span>
+                    <small>задание #{{ trainer_ai_analysis.id }} · {{ trainer_ai_analysis.created_at|date:"d.m.Y H:i" }}</small>
+                </div>
+                <h3>Готовим рабочий план тренера</h3>
+                <p data-ai-status-text>Запрос выполняется в фоне. Когда результат будет готов, страница обновится автоматически.</p>
+                <div class="ai-loading-track" aria-hidden="true"><span></span></div>
+            </div>
+        {% elif trainer_ai_error %}
+            <p class="note">{{ trainer_ai_error }}</p>
+        {% elif trainer_ai %}
+            <div class="ai-management-summary">
+                <div class="ai-management-summary-head">
+                    <strong>Фокус тренера</strong>
+                    {% if trainer_ai.focus_score %}
+                        <span class="status status-good">индекс {{ trainer_ai.focus_score }}/100</span>
+                    {% endif %}
+                </div>
+                <p>{{ trainer_ai.summary|default:"ИИ вернул пустой вывод. Повторите анализ или проверьте ответ API." }}</p>
+                <span class="status status-muted">{{ trainer_ai.model }}</span>
+            </div>
+
+            {% if trainer_ai.priority_clients %}
+                <div class="recommendation-list management-recommendations trainer-ai-recommendations">
+                    {% for item in trainer_ai.priority_clients %}
+                        <article class="recommendation-card priority-{{ item.priority|default:'medium' }}">
+                            <div class="recommendation-top">
+                                <span>{{ item.scenario|default:"фокус" }}</span>
+                                <strong>{{ item.priority|default:"medium" }}</strong>
+                            </div>
+                            <h3>{{ item.client }}</h3>
+                            <p><strong>{{ item.title }}</strong></p>
+                            {% if item.reason %}<p>{{ item.reason }}</p>{% endif %}
+                            <dl class="ai-action-meta">
+                                <div><dt>Действие</dt><dd>{{ item.recommended_action }}</dd></div>
+                                {% if item.message_draft %}<div><dt>Сообщение</dt><dd class="trainer-ai-message">{{ item.message_draft }}</dd></div>{% endif %}
+                                {% if item.business_effect %}<div><dt>Бизнес-эффект</dt><dd>{{ item.business_effect }}</dd></div>{% endif %}
+                                {% if item.deadline %}<div><dt>Срок</dt><dd>{{ item.deadline }}</dd></div>{% endif %}
+                                {% if item.evidence %}<div><dt>Основание</dt><dd>{{ item.evidence }}</dd></div>{% endif %}
+                            </dl>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="dashboard-grid ai-management-grid">
+                <article class="mini-card">
+                    <h3>Корректировка планов</h3>
+                    <ul class="plain-list">
+                        {% for item in trainer_ai.plan_adjustments %}
+                            <li>
+                                <strong>{{ item.client }}</strong>
+                                {% if item.current_signal %}<span>{{ item.current_signal }}</span>{% endif %}
+                                <small>{{ item.adjustment }}</small>
+                                {% if item.why %}<small>{{ item.why }}</small>{% endif %}
+                            </li>
+                        {% empty %}
+                            <li class="muted">Нет срочных корректировок.</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+                <article class="mini-card">
+                    <h3>Сообщения клиентам</h3>
+                    <ul class="plain-list">
+                        {% for item in trainer_ai.communication_scripts %}
+                            <li>
+                                <strong>{{ item.client }}</strong>
+                                {% if item.goal %}<span>{{ item.goal }}</span>{% endif %}
+                                <small>{{ item.message }}</small>
+                            </li>
+                        {% empty %}
+                            <li class="muted">Нет готовых сообщений.</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+                <article class="mini-card">
+                    <h3>Ближайшие тренировки</h3>
+                    <ul class="plain-list">
+                        {% for item in trainer_ai.upcoming_workouts %}
+                            <li>
+                                <strong>{{ item.client }}</strong>
+                                {% if item.preparation %}<span>{{ item.preparation }}</span>{% endif %}
+                                {% if item.watch_out %}<small>{{ item.watch_out }}</small>{% endif %}
+                            </li>
+                        {% empty %}
+                            <li class="muted">Нет отдельных подготовительных задач.</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+                <article class="mini-card">
+                    <h3>Продления</h3>
+                    <ul class="plain-list">
+                        {% for item in trainer_ai.renewal_support %}
+                            <li>
+                                <strong>{{ item.client }}</strong>
+                                <span>{{ item.action }}</span>
+                                {% if item.signal %}<small>{{ item.signal }}</small>{% endif %}
+                            </li>
+                        {% empty %}
+                            <li class="muted">Срочных продлений нет.</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+                <article class="mini-card trainer-ai-week">
+                    <h3>План на 7 дней</h3>
+                    <ul class="plain-list">
+                        {% for action in trainer_ai.next_7_days %}
+                            <li>{{ action }}</li>
+                        {% empty %}
+                            <li class="muted">Нет отдельного недельного плана.</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+            </div>
+        {% else %}
+            <div class="signal-grid management-ai-preview">
+                <article class="signal-card signal-good">
+                    <span>Клиентов тренера</span>
+                    <strong>{{ trainer_ai_payload.trainer.clients_count }}</strong>
+                    <small>{{ trainer_ai_payload.trainer.active_clients_30_days }} активны за 30 дней</small>
+                </article>
+                <article class="signal-card signal-warn">
+                    <span>Нужен контакт</span>
+                    <strong>{{ trainer_ai_payload.scenario_counts.contact_today }}</strong>
+                    <small>клиентов для связи сегодня</small>
+                </article>
+                <article class="signal-card">
+                    <span>Планы и продления</span>
+                    <strong>{{ trainer_ai_payload.scenario_counts.plan_adjustment }}</strong>
+                    <small>{{ trainer_ai_payload.scenario_counts.renewal_support }} продлений в фокусе</small>
+                </article>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Мои клиенты</h2>
+                <a class="btn btn-small" href="{% url 'clients_list' %}">Все</a>
+            </div>
+            <ul class="plain-list">
+                {% for client in clients %}
+                    <li class="person-list-item">
+                        <span class="avatar avatar-compact {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+                        <span>
+                            <a href="{% url 'client_detail' client.id %}">{{ client.full_name }}</a>
+                            <small>{{ client.get_goal_display }}</small>
+                        </span>
+                    </li>
+                {% empty %}
+                    <li class="muted">Клиентов нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Последние тренировки</h2>
+            </div>
+            <ul class="plain-list">
+                {% for workout in recent_workouts %}
+                    <li class="activity-item">
+                        <span class="activity-dot"></span>
+                        <span>{{ workout.client.full_name }} · {{ workout.workout_day.title }} <small>{{ workout.completed_at|date:"d.m.Y H:i" }}</small></span>
+                    </li>
+                {% empty %}
+                    <li class="muted">Выполненных тренировок пока нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Требуют внимания</h2>
+                <a class="btn btn-small" href="{% url 'reports' %}">Отчет</a>
+            </div>
+            <ul class="plain-list">
+                {% for client in metrics.low_activity_clients|slice:":8" %}
+                    <li class="person-list-item">
+                        <span class="avatar avatar-compact {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+                        <a href="{% url 'client_detail' client.id %}">{{ client.full_name }}</a>
+                    </li>
+                {% empty %}
+                    <li class="muted">Список пуст.</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </section>
+{% else %}
+    <section class="dashboard-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Загрузка тренеров</h2>
+                <a class="btn btn-small" href="{% url 'reports' %}">Отчеты</a>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Тренер</th><th>Клиентов</th><th>Активных</th></tr></thead>
+                    <tbody>
+                    {% for trainer in trainers %}
+                        <tr>
+                            <td>
+                                <div class="person-cell">
+                                    <span class="avatar avatar-compact {{ trainer.full_name|avatar_variant }}">{{ trainer.full_name|initials }}</span>
+                                    <span>{{ trainer.full_name }}</span>
+                                </div>
+                            </td>
+                            <td>{{ trainer.clients_count }}</td>
+                            <td>{{ trainer.active_clients_count }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Популярные цели</h2>
+            </div>
+            <ul class="plain-list">
+                {% for row in goal_stats %}
+                    <li>{{ row.goal }} <strong>{{ row.count }}</strong></li>
+                {% endfor %}
+            </ul>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Абонементы</h2>
+            </div>
+            <ul class="plain-list">
+                {% for membership in metrics.expiring_memberships|slice:":8" %}
+                    <li><a href="{% url 'client_detail' membership.client.id %}?tab=membership">{{ membership.client.full_name }}</a> <small>до {{ membership.end_date|date:"d.m.Y" }}</small></li>
+                {% empty %}
+                    <li class="muted">Ближайших окончаний нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if is_client_role %}
+<script>
+window.dashboardCharts = {{ client_dashboard_charts|safe }};
+</script>
+<script src="{% static 'club/charts.js' %}?v=20260609-connect-sparse-progress"></script>
+{% endif %}
+{% if is_trainer_role %}
+<script src="{% static 'club/management_ai.js' %}"></script>
+{% endif %}
+{% endblock %}

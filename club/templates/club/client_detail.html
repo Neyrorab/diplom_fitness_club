@@ -1,0 +1,257 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}{{ client.full_name }}{% endblock %}
+
+{% block content %}
+<header class="profile-hero">
+    <div class="profile-hero-main">
+        <span class="avatar avatar-xl {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+        <div>
+            <p class="eyebrow">Карточка клиента</p>
+            <h1>{{ client.full_name }}</h1>
+            <div class="hero-pills">
+                <span>{{ client.get_goal_display }}</span>
+                <span>{{ client.training_level|default:"уровень не указан" }}</span>
+                <span>{{ client.trainer|default:"тренер не назначен" }}</span>
+            </div>
+        </div>
+    </div>
+    <img class="profile-hero-image" src="{% static 'club/media/progress-checkin.svg' %}" alt="">
+    <div class="actions">
+        {% if is_admin_role or is_trainer_role %}
+            <a class="btn" href="{% url 'client_edit' client.id %}">Редактировать</a>
+            <a class="btn btn-primary" href="{% url 'workout_plan_create' client.id %}">Новый план</a>
+        {% endif %}
+    </div>
+</header>
+
+<nav class="tabs">
+    <a href="#profile">Профиль</a>
+    <a href="#membership">Абонемент</a>
+    <a href="#workouts">Тренировки</a>
+    <a href="#nutrition">Питание</a>
+    <a href="#progress">Прогресс</a>
+    <a href="#recommendations">ИИ-рекомендации</a>
+    <a href="#comments">Комментарии</a>
+</nav>
+
+<section id="profile" class="panel">
+    <div class="panel-head">
+        <h2>Профиль</h2>
+        <span class="status {{ client.status|status_class }}">{{ client.get_status_display }}</span>
+    </div>
+    <dl class="info-grid">
+        <div><dt>Телефон</dt><dd>{{ client.phone|default:"-" }}</dd></div>
+        <div><dt>Email</dt><dd>{{ client.user.email|default:"-" }}</dd></div>
+        <div><dt>Дата рождения</dt><dd>{{ client.birth_date|date:"d.m.Y"|default:"-" }}</dd></div>
+        <div><dt>Рост</dt><dd>{% if client.height %}{{ client.height }} см{% else %}-{% endif %}</dd></div>
+        <div><dt>Цель</dt><dd>{{ client.get_goal_display }}</dd></div>
+        <div><dt>Уровень</dt><dd>{{ client.training_level|default:"-" }}</dd></div>
+        <div><dt>Тренер</dt><dd>{{ client.trainer|default:"не назначен" }}</dd></div>
+        <div><dt>Последняя тренировка</dt><dd>{{ client.last_workout_at|date:"d.m.Y H:i"|default:"нет" }}</dd></div>
+    </dl>
+    {% if client.health_limitations %}
+        <p class="note">{{ client.health_limitations }}</p>
+    {% endif %}
+</section>
+
+<section id="membership" class="panel">
+    <div class="panel-head">
+        <h2>Абонемент</h2>
+        {% if is_admin_role %}<a class="btn btn-small" href="{% url 'membership_create' client.id %}">Добавить</a>{% endif %}
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Тип</th><th>Период</th><th>Посещения</th><th>Статус</th><th></th></tr></thead>
+            <tbody>
+            {% for membership in memberships %}
+                <tr>
+                    <td>{{ membership.type }}</td>
+                    <td>{{ membership.start_date|date:"d.m.Y" }} - {{ membership.end_date|date:"d.m.Y" }}</td>
+                    <td>{{ membership.visits_left }} / {{ membership.visits_total }}</td>
+                    <td>
+                        <span class="status {{ membership.status|status_class }}">{{ membership.get_status_display }}</span>
+                        {% if membership.expires_soon %}<small class="warn-text">истекает</small>{% endif %}
+                    </td>
+                    <td>{% if is_admin_role %}<a href="{% url 'membership_edit' membership.id %}">Продлить</a>{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">Абонементов нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section id="workouts" class="panel">
+    <div class="panel-head">
+        <h2>Тренировки</h2>
+        {% if is_admin_role or is_trainer_role %}<a class="btn btn-small" href="{% url 'workout_plan_create' client.id %}">Новый план</a>{% endif %}
+    </div>
+    <div class="cards-grid">
+        {% for plan in plans %}
+            <article class="mini-card">
+                {% if forloop.counter|divisibleby:"3" %}
+                    <img class="mini-card-media" src="{% static 'club/media/recovery-mobility.png' %}" alt="">
+                {% elif forloop.counter|divisibleby:"2" %}
+                    <img class="mini-card-media" src="{% static 'club/media/exercise-cardio.png' %}" alt="">
+                {% else %}
+                    <img class="mini-card-media" src="{% static 'club/media/exercise-strength.png' %}" alt="">
+                {% endif %}
+                <div class="card-top">
+                    <h3><a href="{% url 'workout_plan_detail' plan.id %}">{{ plan.title }}</a></h3>
+                    <span class="status {{ plan.status|status_class }}">{{ plan.get_status_display }}</span>
+                </div>
+                <p class="muted">{{ plan.get_goal_display }} · {{ plan.start_date|date:"d.m.Y" }}</p>
+                <div class="progress"><span style="width: {{ plan.completion_percent }}%"></span></div>
+                <small>{{ plan.completion_percent }}% выполнения</small>
+            </article>
+        {% empty %}
+            <p class="empty">Планы не созданы.</p>
+        {% endfor %}
+    </div>
+    <h3 class="section-subtitle">История выполнения</h3>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Дата</th><th>План</th><th>День</th><th>Самочувствие</th></tr></thead>
+            <tbody>
+                {% for workout in completed_workouts %}
+                    <tr>
+                        <td>{{ workout.completed_at|date:"d.m.Y H:i" }}</td>
+                        <td>{{ workout.workout_day.workout_plan.title }}</td>
+                        <td>{{ workout.workout_day.title }}</td>
+                        <td>{{ workout.mood|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty">Выполненных тренировок нет.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section id="nutrition" class="panel">
+    <div class="panel-head">
+        <h2>Питание</h2>
+        <div class="actions">
+            <a class="btn btn-small" href="{% url 'nutrition_client' client.id %}?date={{ selected_date|date:'Y-m-d' }}">Открыть</a>
+            {% if is_admin_role or is_trainer_role %}
+                <a class="btn btn-small" href="{% url 'nutrition_target_set' client.id %}">Норма</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="macro-row">
+        <span>{{ nutrition.totals.calories|floatformat:0 }} ккал</span>
+        <span class="macro-protein">Б {{ nutrition.totals.protein|floatformat:0 }}</span>
+        <span class="macro-fat">Ж {{ nutrition.totals.fat|floatformat:0 }}</span>
+        <span class="macro-carbs">У {{ nutrition.totals.carbs|floatformat:0 }}</span>
+    </div>
+    {% if nutrition.target %}
+        <p class="muted">Норма: {{ nutrition.target.calories_target }} ккал · Б {{ nutrition.target.protein_target }} · Ж {{ nutrition.target.fat_target }} · У {{ nutrition.target.carbs_target }}</p>
+    {% endif %}
+</section>
+
+<section id="progress" class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Прогресс</h2>
+            <p class="muted">График за {{ client_chart_period_label }}.</p>
+        </div>
+        <div class="actions">
+            <form method="get" class="inline-action-form chart-period-form compact-period-form">
+                <input type="hidden" name="tab" value="progress">
+                <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+                <label class="ai-provider-picker">
+                    <span>Период</span>
+                    <select name="chart_period" aria-label="Период графика прогресса">
+                        {% for option in client_chart_period_options %}
+                            <option value="{{ option.value }}" {% if option.value == client_chart_period %}selected{% endif %}>{{ option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button class="btn btn-small" type="submit">Показать</button>
+            </form>
+            <a class="btn btn-small" href="{% url 'progress_client' client.id %}?chart_period={{ client_chart_period }}">Открыть</a>
+        </div>
+    </div>
+    <canvas class="chart" id="weightChart" height="180"></canvas>
+    <div class="table-wrap profile-progress-table measurement-table-wrap">
+        <table>
+            <thead><tr><th>Дата</th><th>Вес</th><th>Талия</th><th>Грудь</th><th>Бедра</th></tr></thead>
+            <tbody>
+            {% for record in progress_table_records %}
+                <tr>
+                    <td>{{ record.record_date|date:"d.m.Y" }}</td>
+                    <td>{{ record.weight }}</td>
+                    <td>{{ record.waist|default:"-" }}</td>
+                    <td>{{ record.chest|default:"-" }}</td>
+                    <td>{{ record.hips|default:"-" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">Записей прогресса нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section id="recommendations" class="panel ai-panel">
+    <div class="panel-head">
+        <div>
+            <h2>ИИ-рекомендации</h2>
+            <p class="muted">Автоматический анализ тренировок, питания, прогресса и абонемента.</p>
+        </div>
+        <a class="btn btn-small" href="{% url 'recommendations_client' client.id %}">Открыть полностью</a>
+    </div>
+    <div class="recommendation-summary">
+        <div class="ai-score">
+            <strong>{{ ai_recommendations.score }}</strong>
+            <span>индекс сопровождения</span>
+        </div>
+        <div class="recommendation-list compact-recommendations">
+            {% for item in ai_recommendations.items|slice:":3" %}
+                <article class="recommendation-card priority-{{ item.priority }}">
+                    <div class="recommendation-top">
+                        <span>{{ item.category }}</span>
+                        <strong>{% if item.priority == "high" %}Высокий{% elif item.priority == "medium" %}Средний{% else %}Низкий{% endif %}</strong>
+                    </div>
+                    <h3>{{ item.title }}</h3>
+                    <p>{{ item.action }}</p>
+                </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section id="comments" class="panel">
+    <div class="panel-head">
+        <h2>Комментарии</h2>
+        {% if is_admin_role or is_trainer_role %}<a class="btn btn-small" href="{% url 'comment_create' client.id %}">Добавить</a>{% endif %}
+    </div>
+    <ul class="plain-list">
+        {% for comment in comments %}
+            <li>
+                <strong>{{ comment.get_related_type_display }}</strong>
+                <span>{{ comment.text }}</span>
+                <small>{{ comment.trainer|default:"тренер" }} · {{ comment.created_at|date:"d.m.Y H:i" }}</small>
+            </li>
+        {% empty %}
+            <li class="muted">Комментариев нет.</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.chartData = {
+    labels: {{ progress.labels|safe }},
+    values: {{ progress.weights|safe }},
+    waist: {{ progress.waist|safe }},
+    chest: {{ progress.chest|safe }},
+    hips: {{ progress.hips|safe }}
+};
+</script>
+<script src="{% static 'club/charts.js' %}?v=20260606-y-axis-density"></script>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Продукты{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Справочник</p>
+        <h1>Продукты</h1>
+    </div>
+</header>
+
+<section class="media-strip media-strip-wide">
+    <article class="media-card media-card-feature">
+        <img src="{% static 'club/media/nutrition-bowl.svg' %}" alt="">
+        <div>
+            <span>База продуктов</span>
+            <strong>Калории и БЖУ на 100 г</strong>
+        </div>
+    </article>
+    <article class="nutrition-snapshot">
+        <span class="product-icon icon-protein"></span>
+        <div>
+            <strong>Белки</strong>
+            <small>мясо, рыба, творог, протеин</small>
+        </div>
+    </article>
+    <article class="nutrition-snapshot">
+        <span class="product-icon icon-carbs"></span>
+        <div>
+            <strong>Углеводы</strong>
+            <small>крупы, фрукты, хлеб, паста</small>
+        </div>
+    </article>
+    <article class="nutrition-snapshot">
+        <span class="product-icon icon-fats"></span>
+        <div>
+            <strong>Жиры</strong>
+            <small>масла, орехи, авокадо</small>
+        </div>
+    </article>
+    <article class="nutrition-snapshot">
+        <span class="product-icon icon-other"></span>
+        <div>
+            <strong>Смешанные</strong>
+            <small>нет явного преобладания БЖУ</small>
+        </div>
+    </article>
+</section>
+
+<section class="split-layout">
+    <article class="panel">
+        <form class="filters" method="get">
+            <input name="q" value="{{ query }}" placeholder="Название продукта">
+            <button class="btn btn-primary" type="submit">Найти</button>
+        </form>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Название</th><th>Ккал</th><th>Белки</th><th>Жиры</th><th>Углеводы</th></tr></thead>
+                <tbody>
+                {% for product in products %}
+                    <tr>
+                        <td>
+                            <div class="product-cell">
+                                <span class="product-icon {{ product|product_macro_class }}"></span>
+                                <span>{{ product.name }}</span>
+                            </div>
+                        </td>
+                        <td>{{ product.calories_per_100g }}</td>
+                        <td>{{ product.protein_per_100g }}</td>
+                        <td>{{ product.fat_per_100g }}</td>
+                        <td>{{ product.carbs_per_100g }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="empty">Продукты не найдены.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    {% if is_admin_role or is_trainer_role %}
+        <aside class="panel">
+            <img class="panel-media" src="{% static 'club/media/nutrition-bowl.svg' %}" alt="">
+            <div class="panel-head"><h2>Добавить</h2></div>
+            <form method="post" class="stack">
+                {% csrf_token %}
+                {% for field in form %}
+                    <label>
+                        <span>{{ field.label }}</span>
+                        {{ field }}
+                        {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                    </label>
+                {% endfor %}
+                <button class="btn btn-primary" type="submit">Сохранить</button>
+            </form>
+        </aside>
+    {% endif %}
+</section>
+{% endblock %}

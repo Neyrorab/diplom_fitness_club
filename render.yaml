@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: fitness-club-diploma
+    runtime: python
+    buildCommand: bash build.sh
+    startCommand: python manage.py migrate && python manage.py load_render_demo && gunicorn fitness_club.wsgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fitness-club-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: AI_PROVIDER
+        value: gptunnel
+      - key: GPTUNNEL_API_KEY
+        sync: false
+      - key: GPTUNNEL_MODEL
+        value: claude-4.6-sonnet
+      - key: GPTUNNEL_FALLBACK_MODELS
+        value: gemini-3.5-flash,gpt-5.5-pro
+      - key: GPTUNNEL_FAST_MODEL
+        value: gemini-3.5-flash
+      - key: GPTUNNEL_BALANCED_MODEL
+        value: claude-4.6-sonnet
+      - key: GPTUNNEL_SMART_MODEL
+        value: gpt-5.5-pro
+
+databases:
+  - name: fitness-club-db
+    databaseName: fitness_club
+    user: fitness_club

@@ -1,0 +1,155 @@
+{% load static club_extras %}
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ИС Фитнес-клуб{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'club/styles.css' %}?v=20260527-modern">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <a class="brand" href="{% url 'dashboard' %}">
+                <span class="brand-mark brand-logo-mark">
+                    <img src="{% static 'club/media/pulse-brain-logo-clean.svg' %}" alt="">
+                </span>
+                <span>
+                    <strong>ИС Фитнес-клуб</strong>
+                    <small>{{ request.user.username }}</small>
+                </span>
+            </a>
+            <div class="sidebar-card">
+                <img src="{% static 'club/media/studio-hero.png' %}" alt="">
+                <div class="sidebar-profile-row">
+                    {% if current_client %}
+                        <span class="avatar avatar-compact {{ current_client.full_name|avatar_variant }}">{{ current_client.full_name|initials }}</span>
+                        <span>
+                            <strong>{{ current_client.full_name }}</strong>
+                            <small>{{ current_client.get_goal_display }}</small>
+                        </span>
+                    {% elif current_trainer %}
+                        <span class="avatar avatar-compact {{ current_trainer.full_name|avatar_variant }}">{{ current_trainer.full_name|initials }}</span>
+                        <span>
+                            <strong>{{ current_trainer.full_name }}</strong>
+                            <small>{{ current_trainer.specialization }}</small>
+                        </span>
+                    {% else %}
+                        <span class="avatar avatar-compact avatar-v3">АК</span>
+                        <span>
+                            <strong>Администратор клуба</strong>
+                            <small>операционный контур</small>
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <nav class="nav" aria-label="Основная навигация">
+                <span class="nav-section">Меню</span>
+                <a class="nav-dashboard{% if request.resolver_match.url_name == 'dashboard' %} is-active{% endif %}" href="{% url 'dashboard' %}">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10.5V19h11v-8.5"/><path d="M10 19v-5h4v5"/></svg>
+                    </span>
+                    <span>Кабинет</span>
+                </a>
+                <a class="nav-reviews{% if request.resolver_match.url_name == 'reviews' %} is-active{% endif %}" href="{% url 'reviews' %}">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="m12 4 2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2L7.8 17l.8-4.7L5.2 9l4.7-.7z"/><path d="M7 20h10"/></svg>
+                    </span>
+                    <span>Отзывы</span>
+                </a>
+                <a class="nav-schedule{% if request.resolver_match.url_name == 'schedule' %} is-active{% endif %}" href="{% url 'schedule' %}">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M7 3.8v3"/><path d="M17 3.8v3"/><path d="M4.8 8.5h14.4"/><path d="M5.5 5.5h13v14h-13z"/><path d="M8 12h3.2"/><path d="M8 15.5h5.6"/></svg>
+                    </span>
+                    <span>Расписание</span>
+                </a>
+                {% if is_admin_role or is_trainer_role %}
+                    <a class="nav-clients{% if request.resolver_match.url_name == 'clients_list' or request.resolver_match.url_name == 'client_detail' %} is-active{% endif %}" href="{% url 'clients_list' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M9.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M3.5 19c.8-3.3 2.8-5 6-5s5.2 1.7 6 5"/><path d="M16 11a2.4 2.4 0 1 0 0-4.8"/><path d="M17 14.3c2.1.5 3.3 2 3.7 4.7"/></svg>
+                        </span>
+                        <span>Клиенты</span>
+                    </a>
+                    <a class="nav-exercises{% if request.resolver_match.url_name == 'exercises_list' %} is-active{% endif %}" href="{% url 'exercises_list' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M6 7v10"/><path d="M18 7v10"/><path d="M3.5 9v6"/><path d="M20.5 9v6"/><path d="M7 12h10"/></svg>
+                        </span>
+                        <span>Упражнения</span>
+                    </a>
+                    <a class="nav-products{% if request.resolver_match.url_name == 'products_list' %} is-active{% endif %}" href="{% url 'products_list' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 7c2.8-1.6 7 .5 7 5.1 0 4.8-3.2 7.4-5.6 7.4-.7 0-1-.3-1.4-.3s-.8.3-1.5.3C8.2 19.5 5 16.9 5 12.1 5 7.5 9.1 5.4 12 7Z"/><path d="M12.2 6.6c.2-2 1.5-3.2 3.5-3.6"/><path d="M10 5.1c-1.1-.9-2.2-1.2-3.4-.9"/></svg>
+                        </span>
+                        <span>Продукты</span>
+                    </a>
+                    <a class="nav-reports{% if request.resolver_match.url_name == 'reports' %} is-active{% endif %}" href="{% url 'reports' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M6 4.5h9l3 3V20H6z"/><path d="M14.5 4.5V8H18"/><path d="M8.8 15.5l2.2-2.4 2.1 1.6 2.8-3.7"/><path d="M8.8 17.7h7.4"/></svg>
+                        </span>
+                        <span>Отчеты</span>
+                    </a>
+                {% endif %}
+                {% if is_admin_role %}
+                    <a class="nav-analytics{% if request.resolver_match.url_name == 'admin_dashboards' %} is-active{% endif %}" href="{% url 'admin_dashboards' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M5 19V9"/><path d="M12 19V5"/><path d="M19 19v-7"/><path d="M3.5 19.5h17"/></svg>
+                        </span>
+                        <span>Дашборды</span>
+                    </a>
+                    <a class="nav-trainers{% if request.resolver_match.url_name == 'trainers_list' %} is-active{% endif %}" href="{% url 'trainers_list' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M5.5 19c.9-3.6 3-5.4 6.5-5.4s5.6 1.8 6.5 5.4"/><path d="m17.5 5.2.6 1.2 1.3.2-.9.9.2 1.3-1.2-.6-1.2.6.2-1.3-.9-.9 1.3-.2z"/></svg>
+                        </span>
+                        <span>Тренеры</span>
+                    </a>
+                {% endif %}
+                {% if is_client_role %}
+                    <a class="nav-profile{% if request.resolver_match.url_name == 'client_detail' %} is-active{% endif %}" href="{% url 'client_detail' current_client.id %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 11a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z"/><path d="M5.2 19.2c1-3.6 3.2-5.4 6.8-5.4s5.8 1.8 6.8 5.4"/></svg>
+                        </span>
+                        <span>Профиль</span>
+                    </a>
+                    <a class="nav-products{% if request.resolver_match.url_name == 'nutrition' %} is-active{% endif %}" href="{% url 'nutrition' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M7 4v6"/><path d="M4.8 4v6"/><path d="M9.2 4v6"/><path d="M7 10v10"/><path d="M16 4c2.2 1.4 3.2 3.3 3.2 5.5 0 2.6-1.3 4.4-3.2 5V20"/><path d="M16 4v10.5"/></svg>
+                        </span>
+                        <span>Питание</span>
+                    </a>
+                    <a class="nav-progress{% if request.resolver_match.url_name == 'progress' %} is-active{% endif %}" href="{% url 'progress' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4.5 17.5 9 13l3 2.8 6.8-7.3"/><path d="M15 8.5h3.8v3.8"/><path d="M4.5 20h15"/></svg>
+                        </span>
+                        <span>Прогресс</span>
+                    </a>
+                    <a class="nav-ai{% if request.resolver_match.url_name == 'recommendations' %} is-active{% endif %}" href="{% url 'recommendations' %}">
+                        <span class="nav-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="m12 3 1.4 4.2L17.6 9l-4.2 1.8L12 15l-1.4-4.2L6.4 9l4.2-1.8z"/><path d="m18.5 14 .7 2.1 2.1.9-2.1.9-.7 2.1-.7-2.1-2.1-.9 2.1-.9z"/><path d="m5.5 14 .5 1.5 1.5.6-1.5.7-.5 1.5-.5-1.5-1.5-.7 1.5-.6z"/></svg>
+                        </span>
+                        <span>ИИ-рекомендации</span>
+                    </a>
+                {% endif %}
+            </nav>
+            <a class="logout" href="{% url 'logout' %}">
+                <span class="nav-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M9 5H5.5v14H9"/><path d="M13 12h7"/><path d="m17 8 4 4-4 4"/><path d="M9 12h6"/></svg>
+                </span>
+                <span>Выйти</span>
+            </a>
+        </aside>
+
+        <main class="content">
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="message {{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

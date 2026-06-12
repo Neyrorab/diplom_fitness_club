@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" role="img" aria-labelledby="title desc">
+  <title id="title">Balanced nutrition example</title>
+  <desc id="desc">Illustrated table with a balanced meal bowl, fruit, and water bottle.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#fff6e8"/>
+      <stop offset=".5" stop-color="#edf7ef"/>
+      <stop offset="1" stop-color="#e6edf9"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#1f2b2a" flood-opacity=".2"/>
+    </filter>
+  </defs>
+  <rect width="720" height="480" rx="36" fill="url(#bg)"/>
+  <path d="M0 338c118-24 239-29 362-14 124 16 243 9 358-22v178H0z" fill="#23332f"/>
+  <g filter="url(#shadow)">
+    <ellipse cx="352" cy="286" rx="178" ry="78" fill="#fffaf1"/>
+    <path d="M190 276c34 92 88 138 162 138s130-46 168-138" fill="#e0653e"/>
+    <ellipse cx="352" cy="276" rx="166" ry="66" fill="#fffaf1"/>
+    <circle cx="300" cy="254" r="30" fill="#8ab45a"/>
+    <circle cx="362" cy="244" r="32" fill="#f2b84b"/>
+    <circle cx="414" cy="274" r="28" fill="#315cbb"/>
+    <path d="M250 292c56-28 126-35 212-20" stroke="#0f766e" stroke-width="18" stroke-linecap="round"/>
+    <path d="M248 250c25 18 48 28 70 30" stroke="#f4d085" stroke-width="14" stroke-linecap="round"/>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="548" y="150" width="68" height="192" rx="28" fill="#315cbb"/>
+    <rect x="562" y="118" width="40" height="54" rx="16" fill="#8ab45a"/>
+    <rect x="556" y="198" width="52" height="88" rx="18" fill="#ffffff" opacity=".26"/>
+  </g>
+  <g filter="url(#shadow)">
+    <circle cx="138" cy="294" r="44" fill="#e0653e"/>
+    <circle cx="172" cy="252" r="26" fill="#f2b84b"/>
+    <path d="M150 252c14-25 30-41 48-50" stroke="#8ab45a" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

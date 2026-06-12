@@ -1,0 +1,13 @@
+.venv/
+.env
+__pycache__/
+*.py[cod]
+db.sqlite3
+db.sqlite3.*
+server.*.log
+server*.log
+client-ai-*.png
+render-check/
+staticfiles/
+.render/
+.DS_Store

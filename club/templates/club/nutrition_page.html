@@ -1,0 +1,109 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Питание{% endblock %}
+
+{% block content %}
+<header class="profile-hero nutrition-hero">
+    <div class="profile-hero-main">
+        <span class="avatar avatar-xl {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+        <div>
+            <p class="eyebrow">Дневник питания</p>
+            <h1>{{ client.full_name }}</h1>
+            <div class="hero-pills">
+                <span>{{ selected_date|date:"d.m.Y" }}</span>
+                <span>{{ nutrition.totals.calories|floatformat:0 }} ккал</span>
+                {% if nutrition.target %}<span>цель {{ nutrition.target.calories_target }} ккал</span>{% endif %}
+            </div>
+        </div>
+    </div>
+    <img class="profile-hero-image" src="{% static 'club/media/nutrition-bowl.svg' %}" alt="">
+    <a class="btn" href="{% url 'client_detail' client.id %}?tab=nutrition">К карточке</a>
+</header>
+
+<section class="panel">
+    <form method="get" class="filters">
+        <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+        <button class="btn btn-primary" type="submit">Показать</button>
+    </form>
+</section>
+
+<section class="stats-grid">
+    <article class="stat"><span>Ккал</span><strong>{{ nutrition.totals.calories|floatformat:0 }}</strong></article>
+    <article class="stat"><span>Белки</span><strong>{{ nutrition.totals.protein|floatformat:0 }}</strong></article>
+    <article class="stat"><span>Жиры</span><strong>{{ nutrition.totals.fat|floatformat:0 }}</strong></article>
+    <article class="stat"><span>Углеводы</span><strong>{{ nutrition.totals.carbs|floatformat:0 }}</strong></article>
+</section>
+
+{% if nutrition.target %}
+    <section class="panel">
+        <div class="panel-head"><h2>Норма</h2></div>
+        <div class="macro-row">
+            <span>{{ nutrition.target.calories_target }} ккал</span>
+            <span class="macro-protein">Б {{ nutrition.target.protein_target }}</span>
+            <span class="macro-fat">Ж {{ nutrition.target.fat_target }}</span>
+            <span class="macro-carbs">У {{ nutrition.target.carbs_target }}</span>
+        </div>
+        <p class="muted">Отклонение: {{ nutrition.deviation.calories|floatformat:0 }} ккал · Б {{ nutrition.deviation.protein|floatformat:0 }} · Ж {{ nutrition.deviation.fat|floatformat:0 }} · У {{ nutrition.deviation.carbs|floatformat:0 }}</p>
+    </section>
+{% endif %}
+
+<section class="split-layout">
+    <article class="panel">
+        <div class="panel-head"><h2>{{ selected_date|date:"d.m.Y" }}</h2></div>
+        {% for meal_key, meal_label in nutrition.meal_types %}
+            {% with meal=nutrition.meals|get_item:meal_key %}
+                <div class="meal-block">
+                    <h3>{{ meal_label }}</h3>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Продукт</th><th>Вес</th><th>Ккал</th><th>Б</th><th>Ж</th><th>У</th><th></th></tr></thead>
+                            <tbody>
+                            {% if meal %}
+                                {% for item in meal.items.all %}
+                                    <tr>
+                                        <td>{{ item }}</td>
+                                        <td>{{ item.weight_grams }}</td>
+                                        <td>{{ item.calories|floatformat:1 }}</td>
+                                        <td>{{ item.protein|floatformat:1 }}</td>
+                                        <td>{{ item.fat|floatformat:1 }}</td>
+                                        <td>{{ item.carbs|floatformat:1 }}</td>
+                                        <td>
+                                            {% if is_admin_role or is_trainer_role or is_client_role %}
+                                                <form method="post" action="{% url 'meal_item_delete' item.id %}" class="inline-action-form">
+                                                    {% csrf_token %}
+                                                    <button class="btn btn-small" type="submit">Удалить</button>
+                                                </form>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr><td colspan="7" class="empty">Нет записей.</td></tr>
+                            {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endwith %}
+        {% endfor %}
+    </article>
+
+    <aside class="panel">
+        <img class="panel-media" src="{% static 'club/media/nutrition-bowl.svg' %}" alt="">
+        <div class="panel-head"><h2>Добавить продукт</h2></div>
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}
+                <label>
+                    <span>{{ field.label }}</span>
+                    {{ field }}
+                    {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </label>
+            {% endfor %}
+            <button class="btn btn-primary" type="submit">Добавить</button>
+        </form>
+    </aside>
+</section>
+{% endblock %}

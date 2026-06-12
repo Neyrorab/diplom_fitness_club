@@ -1,0 +1,87 @@
+{% extends "club/base.html" %}
+{% load club_extras %}
+
+{% block title %}Клиенты{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Учет</p>
+        <h1>Клиенты</h1>
+    </div>
+    {% if is_admin_role %}
+        <a class="btn btn-primary" href="{% url 'client_create' %}">Добавить клиента</a>
+    {% endif %}
+</header>
+
+<section class="panel">
+    <form class="filters" method="get">
+        <input name="q" value="{{ filters.q }}" placeholder="Имя, телефон, email">
+        <select name="status">
+            <option value="">Все статусы</option>
+            {% for value,label in statuses %}
+                <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        {% if is_admin_role %}
+            <select name="trainer">
+                <option value="">Все тренеры</option>
+                {% for trainer in trainers %}
+                    <option value="{{ trainer.id }}" {% if filters.trainer == trainer.id|stringformat:"s" %}selected{% endif %}>{{ trainer.full_name }}</option>
+                {% endfor %}
+            </select>
+        {% endif %}
+        <select name="activity">
+            <option value="">Любая активность</option>
+            <option value="active" {% if filters.activity == "active" %}selected{% endif %}>Активные за 30 дней</option>
+            <option value="low" {% if filters.activity == "low" %}selected{% endif %}>Низкая активность</option>
+        </select>
+        <button class="btn btn-primary" type="submit">Найти</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ФИО</th>
+                    <th>Контакты</th>
+                    <th>Цель</th>
+                    <th>Тренер</th>
+                    <th>Статус</th>
+                    <th>Последняя тренировка</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for client in clients %}
+                    <tr>
+                        <td>
+                            <div class="person-cell">
+                                <span class="avatar avatar-compact {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+                                <span>
+                                    <a href="{% url 'client_detail' client.id %}">{{ client.full_name }}</a>
+                                    <small>{{ client.training_level|default:"уровень не указан" }}</small>
+                                </span>
+                            </div>
+                        </td>
+                        <td>{{ client.phone }}<br><small>{{ client.user.email }}</small></td>
+                        <td>{{ client.get_goal_display }}</td>
+                        <td>{{ client.trainer|default:"-" }}</td>
+                        <td><span class="status {{ client.status|status_class }}">{{ client.get_status_display }}</span></td>
+                        <td>
+                            {% if client.last_workout_at %}
+                                {{ client.last_workout_at|date:"d.m.Y H:i" }}
+                            {% else %}
+                                <span class="muted">нет</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="empty">Клиенты не найдены.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

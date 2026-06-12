@@ -1,0 +1,104 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Упражнения{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Справочник</p>
+        <h1>Упражнения</h1>
+    </div>
+</header>
+
+<section class="media-strip exercise-legend">
+    <article class="exercise-snapshot exercise-snapshot-feature">
+        <span class="exercise-thumb thumb-strength"></span>
+        <div>
+            <span>Маркировка</span>
+            <strong>Типы упражнений</strong>
+            <small>Цвет маркера помогает быстро отличать формат нагрузки в списке.</small>
+        </div>
+    </article>
+    <article class="exercise-snapshot">
+        <span class="exercise-thumb thumb-strength"></span>
+        <div>
+            <strong>Силовое</strong>
+            <small>базовые и изолирующие движения</small>
+        </div>
+    </article>
+    <article class="exercise-snapshot">
+        <span class="exercise-thumb thumb-cardio"></span>
+        <div>
+            <strong>Кардио</strong>
+            <small>темп, выносливость, расход энергии</small>
+        </div>
+    </article>
+    <article class="exercise-snapshot">
+        <span class="exercise-thumb thumb-mobility"></span>
+        <div>
+            <strong>Функционал</strong>
+            <small>корпус, статика, контроль движения</small>
+        </div>
+    </article>
+    <article class="exercise-snapshot">
+        <span class="exercise-thumb thumb-other"></span>
+        <div>
+            <strong>Другое</strong>
+            <small>нестандартный или уточненный тип</small>
+        </div>
+    </article>
+</section>
+
+<section class="split-layout">
+    <article class="panel">
+        <form class="filters" method="get">
+            <select name="group">
+                <option value="">Все группы мышц</option>
+                {% for group in groups %}
+                    <option value="{{ group }}" {% if selected_group == group %}selected{% endif %}>{{ group }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Показать</button>
+        </form>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Название</th><th>Группа</th><th>Тип</th><th>Техника</th></tr></thead>
+                <tbody>
+                {% for exercise in exercises %}
+                    <tr>
+                        <td>
+                            <div class="exercise-cell">
+                                <span class="exercise-thumb {{ exercise.exercise_type|exercise_type_class }}"></span>
+                                <span>{{ exercise.name }}</span>
+                            </div>
+                        </td>
+                        <td>{{ exercise.muscle_group }}</td>
+                        <td>{{ exercise.exercise_type }}</td>
+                        <td>{{ exercise.technique_description|truncatechars:90 }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty">Упражнений нет.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <aside class="panel">
+        <img class="panel-media" src="{% static 'club/media/exercise-strength.png' %}" alt="">
+        <div class="panel-head"><h2>Добавить</h2></div>
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {% for field in form %}
+                <label>
+                    <span>{{ field.label }}</span>
+                    {{ field }}
+                    {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </label>
+            {% endfor %}
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+        </form>
+    </aside>
+</section>
+{% endblock %}
