@@ -1,0 +1,238 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Отзывы{% endblock %}
+
+{% block content %}
+<header class="club-hero reviews-hero">
+    <div class="club-hero-copy">
+        <p class="eyebrow">Отзывы</p>
+        <h1>Отзывы клиентов о клубе и тренерах</h1>
+        <p class="hero-lead">
+            Реальные впечатления клиентов помогают видеть сильные стороны сервиса, качество тренировок и то, что стоит улучшить.
+        </p>
+        <div class="hero-pills">
+            <span>{{ reviews_total }} о клубе</span>
+            <span>{{ trainer_reviews_total }} о тренерах</span>
+            <span>средняя оценка клуба {{ average_rating }}/5</span>
+        </div>
+    </div>
+    <div class="club-hero-media">
+        <img src="{% static 'club/media/studio-hero.png' %}" alt="">
+        <div class="hero-floating-card">
+            <strong>{{ trainer_average_rating }}</strong>
+            <span>средняя оценка тренеров</span>
+        </div>
+    </div>
+    {% if is_client_role %}
+        <div class="actions">
+            <a class="btn btn-primary" href="#review-form">Оставить отзыв</a>
+        </div>
+    {% endif %}
+</header>
+
+<section class="stats-grid reviews-stats">
+    <article class="stat">
+        <span>Оценка клуба</span>
+        <strong>{{ average_rating }}</strong>
+    </article>
+    <article class="stat">
+        <span>Отзывы о клубе</span>
+        <strong>{{ reviews_total }}</strong>
+    </article>
+    <article class="stat">
+        <span>Оценка тренеров</span>
+        <strong>{{ trainer_average_rating }}</strong>
+    </article>
+    <article class="stat">
+        <span>{% if is_client_role %}Мои оценки{% else %}Оценки тренеров{% endif %}</span>
+        <strong>{% if is_client_role %}{{ user_reviews_total|add:user_trainer_reviews_total }}{% else %}{{ trainer_reviews_total }}{% endif %}</strong>
+    </article>
+</section>
+
+<section class="reviews-layout">
+    <div class="reviews-stack">
+        <article id="club-reviews" class="panel reviews-list-panel">
+            <div class="panel-head">
+                <h2>Отзывы о клубе</h2>
+                <span class="status status-good">{{ reviews|length }} в списке</span>
+            </div>
+            <div class="reviews-list">
+                {% for review in reviews %}
+                    <article class="review-card review-rating-{{ review.rating }}">
+                        <div class="review-card-head">
+                            <div class="person-cell">
+                                <span class="avatar avatar-compact {{ review.client.full_name|avatar_variant }}">{{ review.client.full_name|initials }}</span>
+                                <span>
+                                    <strong>{{ review.client.full_name }}</strong>
+                                    <small>{{ review.created_at|date:"d.m.Y H:i" }}</small>
+                                </span>
+                            </div>
+                            <div class="rating-stars" aria-label="{{ review.rating }} из 5">
+                                {% for star in "12345" %}
+                                    <span class="{% if forloop.counter <= review.rating %}is-filled{% endif %}">★</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <h3>{{ review.title }}</h3>
+                        <p>{{ review.text }}</p>
+                        {% if not review.is_published %}
+                            <span class="status status-warn">на модерации</span>
+                        {% endif %}
+                    </article>
+                {% empty %}
+                    <p class="empty">Пока отзывов о клубе нет. Первый отзыв появится здесь после отправки клиентом.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article id="trainer-reviews" class="panel reviews-list-panel">
+            <div class="panel-head">
+                <div>
+                    <h2>Оценки тренеров</h2>
+                    <p class="muted">Клиенты оценивают конкретного тренера, а администратор видит общую картину по каждому специалисту.</p>
+                </div>
+                <span class="status status-good">{{ trainer_reviews|length }} в списке</span>
+            </div>
+
+            {% if trainer_rating_rows %}
+                <div class="trainer-rating-summary">
+                    {% for row in trainer_rating_rows|slice:":4" %}
+                        <div class="trainer-rating-row">
+                            <div class="person-cell">
+                                <span class="avatar avatar-compact {{ row.full_name|avatar_variant }}">{{ row.full_name|initials }}</span>
+                                <span>
+                                    <strong>{{ row.full_name }}</strong>
+                                    <small>{{ row.specialization }}</small>
+                                </span>
+                            </div>
+                            <span class="status status-muted">{{ row.average_rating|floatformat:1 }}/5 · {{ row.reviews_count }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="reviews-list">
+                {% for review in trainer_reviews %}
+                    <article class="review-card trainer-review-card review-rating-{{ review.rating }}">
+                        <div class="review-card-head">
+                            <div class="person-cell">
+                                <span class="avatar avatar-compact {{ review.client.full_name|avatar_variant }}">{{ review.client.full_name|initials }}</span>
+                                <span>
+                                    <strong>{{ review.client.full_name }}</strong>
+                                    <small>{{ review.created_at|date:"d.m.Y H:i" }}</small>
+                                </span>
+                            </div>
+                            <div class="rating-stars" aria-label="{{ review.rating }} из 5">
+                                {% for star in "12345" %}
+                                    <span class="{% if forloop.counter <= review.rating %}is-filled{% endif %}">★</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="review-card-meta">
+                            <span class="status status-muted">Тренер: {{ review.trainer.full_name }}</span>
+                        </div>
+                        <h3>{{ review.title }}</h3>
+                        <p>{{ review.text }}</p>
+                        {% if not review.is_published %}
+                            <span class="status status-warn">на модерации</span>
+                        {% endif %}
+                    </article>
+                {% empty %}
+                    <p class="empty">Пока оценок тренеров нет. После первой оценки здесь появится отдельная лента по тренерам.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </div>
+
+    <aside id="review-form" class="panel review-form-panel">
+        {% if form %}
+            <div class="review-form-section">
+                <div class="panel-head">
+                    <h2>Оставить отзыв о клубе</h2>
+                    <span class="status status-muted">клиент</span>
+                </div>
+                <form method="post" class="form-grid review-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="review_type" value="club">
+                    {% if form.non_field_errors %}
+                        <div class="form-errors wide">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    {% for field in form %}
+                        <label class="{% if field.name == 'text' %}wide{% endif %}">
+                            <span>{{ field.label }}</span>
+                            {{ field }}
+                            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                            {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                        </label>
+                    {% endfor %}
+                    <div class="wide actions">
+                        <button class="btn btn-primary" type="submit">Опубликовать</button>
+                    </div>
+                </form>
+            </div>
+
+            {% if trainer_review_form %}
+                <div class="review-form-section">
+                    <div class="panel-head">
+                        <h2>Оценить тренера</h2>
+                        <span class="status status-muted">по специалисту</span>
+                    </div>
+                    <form method="post" class="form-grid review-form trainer-review-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="review_type" value="trainer">
+                        {% if trainer_review_form.non_field_errors %}
+                            <div class="form-errors wide">{{ trainer_review_form.non_field_errors }}</div>
+                        {% endif %}
+                        {% for field in trainer_review_form %}
+                            <label class="{% if field.name == 'text' %}wide{% endif %}">
+                                <span>{{ field.label }}</span>
+                                {{ field }}
+                                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                                {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                            </label>
+                        {% endfor %}
+                        <div class="wide actions">
+                            <button class="btn btn-primary" type="submit">Отправить оценку</button>
+                        </div>
+                    </form>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="panel-head">
+                <h2>Обратная связь</h2>
+                <span class="status status-muted">просмотр</span>
+            </div>
+            <p class="muted">
+                Отзывы и оценки тренеров отправляют клиенты из личного кабинета. Администратор может смотреть сводку здесь и модерировать записи в панели Django admin.
+            </p>
+        {% endif %}
+
+        <div class="rating-breakdown-block">
+            <h3>Отзывы о клубе</h3>
+            <div class="rating-breakdown">
+                {% for row in rating_breakdown %}
+                    <div class="rating-row">
+                        <span>{{ row.rating }} ★</span>
+                        <div class="review-meter"><span style="width: {{ row.percent }}%"></span></div>
+                        <small>{{ row.count }}</small>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="rating-breakdown-block">
+            <h3>Оценки тренеров</h3>
+            <div class="rating-breakdown">
+                {% for row in trainer_rating_breakdown %}
+                    <div class="rating-row">
+                        <span>{{ row.rating }} ★</span>
+                        <div class="review-meter"><span style="width: {{ row.percent }}%"></span></div>
+                        <small>{{ row.count }}</small>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}

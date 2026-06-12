@@ -1,0 +1,322 @@
+{% extends "club/base.html" %}
+{% load club_extras %}
+
+{% block title %}Расписание{% endblock %}
+
+{% block content %}
+<header class="club-hero schedule-hero">
+    <div class="club-hero-copy">
+        <p class="eyebrow">Расписание</p>
+        <h1>{% if schedule_role == "trainer" %}График занятий тренера{% elif schedule_role == "client" %}Запись на тренировку{% else %}Расписание клуба{% endif %}</h1>
+        <p class="hero-lead">
+            {% if schedule_role == "trainer" %}
+                Создавайте свободные окна, отслеживайте записи клиентов и держите ближайшие тренировки в одном рабочем графике.
+            {% elif schedule_role == "client" %}
+                Выбирайте свободное время у своего тренера и отменяйте занятие заранее, если планы изменились.
+            {% else %}
+                Общий обзор свободных и занятых слотов тренеров.
+            {% endif %}
+        </p>
+        <div class="hero-pills">
+            <span>{{ schedule_stats.available_slots }} свободных окон</span>
+            <span>{{ schedule_stats.booked_sessions }} записей</span>
+            <span>отмена за {{ schedule_stats.cancel_deadline_hours }} часа</span>
+        </div>
+    </div>
+</header>
+
+<section class="stats-grid">
+    <article class="stat">
+        <span>Свободные окна</span>
+        <strong>{{ schedule_stats.available_slots }}</strong>
+    </article>
+    <article class="stat">
+        <span>Ближайшие записи</span>
+        <strong>{{ schedule_stats.booked_sessions }}</strong>
+    </article>
+    <article class="stat">
+        <span>Правило отмены</span>
+        <strong>24ч</strong>
+    </article>
+    <article class="stat">
+        <span>Роль</span>
+        <strong>{% if schedule_role == "trainer" %}тренер{% elif schedule_role == "client" %}клиент{% else %}админ{% endif %}</strong>
+    </article>
+</section>
+
+{% if schedule_role == "trainer" %}
+    <section class="split-layout schedule-layout">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Создать свободное окно</h2>
+            </div>
+            <form method="post" class="form-grid compact">
+                {% csrf_token %}
+                {% if slot_form.non_field_errors %}
+                    <div class="form-errors wide">{{ slot_form.non_field_errors }}</div>
+                {% endif %}
+                {% for field in slot_form %}
+                    <label>
+                        <span>{{ field.label }}</span>
+                        {{ field }}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                    </label>
+                {% endfor %}
+                <div class="wide actions">
+                    <button class="btn btn-primary" type="submit">Добавить в график</button>
+                </div>
+            </form>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Ближайшие записи</h2>
+            </div>
+            <ul class="plain-list schedule-list">
+                {% for appointment in appointments %}
+                    <li class="schedule-item is-booked">
+                        <div>
+                            <strong>{{ appointment.slot.start_at|date:"d.m.Y H:i" }}</strong>
+                            <span>{{ appointment.client.full_name }}</span>
+                            <small>{{ appointment.slot.end_at|date:"H:i" }} · {{ appointment.client.get_goal_display }}</small>
+                        </div>
+                        <div class="actions">
+                            <a class="btn btn-small" href="{% url 'client_detail' appointment.client.id %}">Карточка</a>
+                            {% if appointment.can_complete %}
+                                <form method="post" action="{% url 'schedule_appointment_complete' appointment.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-primary btn-small" type="submit">Провести</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% empty %}
+                    <li class="muted">Ближайших записей пока нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </section>
+
+    <section class="panel schedule-calendar-panel">
+        <div class="panel-head">
+            <h2>Недельный календарь</h2>
+            <span class="status status-muted">свободные и занятые окна</span>
+        </div>
+        <div class="schedule-weeks">
+            {% for week in schedule_weeks %}
+                <section class="schedule-week">
+                    <div class="schedule-week-head">
+                        <h3>{{ week.start|date:"d.m" }}-{{ week.end|date:"d.m" }}</h3>
+                        <span>{{ week.available_count }} свободно · {{ week.booked_count }} занято</span>
+                    </div>
+                    <div class="schedule-week-grid">
+                        {% for day in week.days %}
+                            <article class="schedule-day-card {% if day.is_today %}is-today{% endif %}">
+                                <div class="schedule-day-head">
+                                    <span>{{ day.weekday }}</span>
+                                    <strong>{{ day.date|date:"d.m" }}</strong>
+                                </div>
+                                <div class="schedule-day-body">
+                                    {% for row in day.rows %}
+                                        <div class="schedule-time-chip {% if row.appointment %}is-booked{% elif row.is_available %}is-free{% endif %}">
+                                            <div>
+                                                <strong>{{ row.slot.start_at|date:"H:i" }}-{{ row.slot.end_at|date:"H:i" }}</strong>
+                                                {% if row.appointment %}
+                                                    <small>{{ row.appointment.client.full_name }}</small>
+                                                {% elif row.slot.note %}
+                                                    <small>{{ row.slot.note }}</small>
+                                                {% else %}
+                                                    <small>свободное окно</small>
+                                                {% endif %}
+                                            </div>
+                                            {% if row.appointment %}
+                                                <span class="status status-good">занято</span>
+                                            {% elif row.is_available %}
+                                                <form method="post" action="{% url 'schedule_slot_deactivate' row.slot.id %}">
+                                                    {% csrf_token %}
+                                                    <button class="btn btn-small" type="submit">Убрать</button>
+                                                </form>
+                                            {% else %}
+                                                <span class="status status-muted">недоступно</span>
+                                            {% endif %}
+                                        </div>
+                                    {% empty %}
+                                        <span class="schedule-empty">Нет окон</span>
+                                    {% endfor %}
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% empty %}
+                <p class="muted">В графике пока нет будущих слотов.</p>
+            {% endfor %}
+        </div>
+    </section>
+{% elif schedule_role == "client" %}
+    <section class="dashboard-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Мои записи</h2>
+            </div>
+            <ul class="plain-list schedule-list">
+                {% for appointment in appointments %}
+                    <li class="schedule-item is-booked">
+                        <div>
+                            <strong>{{ appointment.slot.start_at|date:"d.m.Y H:i" }}</strong>
+                            <span>{{ appointment.slot.trainer.full_name }}</span>
+                            <small>{{ appointment.slot.end_at|date:"H:i" }} · {{ appointment.get_status_display }}</small>
+                        </div>
+                        {% if appointment.can_cancel_by_client %}
+                            <form method="post" action="{% url 'schedule_appointment_cancel' appointment.id %}" class="schedule-cancel-form">
+                                {% csrf_token %}
+                                <input class="form-control" type="text" name="reason" placeholder="Причина отмены">
+                                <button class="btn btn-small" type="submit">Отменить</button>
+                            </form>
+                        {% elif appointment.can_complete and appointment.completion_day %}
+                            <a class="btn btn-primary btn-small" href="{% url 'complete_workout' appointment.completion_day.id %}?appointment={{ appointment.id }}">Отметить тренировку</a>
+                        {% else %}
+                            <small class="muted">Отмена через сайт уже закрыта</small>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li class="muted">У вас пока нет будущих записей.</li>
+                {% endfor %}
+            </ul>
+        </article>
+
+        <article class="panel schedule-calendar-panel">
+            <div class="panel-head">
+                <h2>Доступные окна</h2>
+                {% if client.trainer %}<span class="status status-muted">{{ client.trainer.full_name }}</span>{% endif %}
+            </div>
+            {% if client.trainer %}
+                <div class="schedule-weeks compact-calendar">
+                    {% for week in schedule_weeks %}
+                        <section class="schedule-week">
+                            <div class="schedule-week-head">
+                                <h3>{{ week.start|date:"d.m" }}-{{ week.end|date:"d.m" }}</h3>
+                                <span>{{ week.available_count }} свободных окон</span>
+                            </div>
+                            <div class="schedule-week-grid">
+                                {% for day in week.days %}
+                                    <article class="schedule-day-card {% if day.is_today %}is-today{% endif %}">
+                                        <div class="schedule-day-head">
+                                            <span>{{ day.weekday }}</span>
+                                            <strong>{{ day.date|date:"d.m" }}</strong>
+                                        </div>
+                                        <div class="schedule-day-body">
+                                            {% for row in day.rows %}
+                                                <div class="schedule-time-chip is-free">
+                                                    <div>
+                                                        <strong>{{ row.slot.start_at|date:"H:i" }}-{{ row.slot.end_at|date:"H:i" }}</strong>
+                                                        <small>{{ row.slot.note|default:"свободное окно" }}</small>
+                                                    </div>
+                                                    <form method="post" action="{% url 'schedule_slot_book' row.slot.id %}">
+                                                        {% csrf_token %}
+                                                        <button class="btn btn-primary btn-small" type="submit">Записаться</button>
+                                                    </form>
+                                                </div>
+                                            {% empty %}
+                                                <span class="schedule-empty">Нет окон</span>
+                                            {% endfor %}
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% empty %}
+                        <p class="muted">У тренера пока нет свободных окон.</p>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">Для записи нужно назначить тренера в карточке клиента.</p>
+            {% endif %}
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Правила записи</h2>
+            </div>
+            <ul class="plain-list">
+                <li>Запись доступна только на свободные будущие слоты вашего тренера.</li>
+                <li>Отменить занятие через сайт можно не позднее чем за 24 часа до начала.</li>
+                <li>После отмены окно снова становится доступным в расписании.</li>
+            </ul>
+        </article>
+    </section>
+{% else %}
+    <section class="dashboard-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Ближайшие записи</h2>
+            </div>
+            <ul class="plain-list schedule-list">
+                {% for appointment in appointments %}
+                    <li class="schedule-item is-booked">
+                        <div>
+                            <strong>{{ appointment.slot.start_at|date:"d.m.Y H:i" }}</strong>
+                            <span>{{ appointment.client.full_name }}</span>
+                            <small>{{ appointment.slot.trainer.full_name }}</small>
+                        </div>
+                        {% if appointment.can_complete %}
+                            <form method="post" action="{% url 'schedule_appointment_complete' appointment.id %}">
+                                {% csrf_token %}
+                                <button class="btn btn-primary btn-small" type="submit">Провести</button>
+                            </form>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li class="muted">Ближайших записей нет.</li>
+                {% endfor %}
+            </ul>
+        </article>
+        <article class="panel schedule-calendar-panel">
+            <div class="panel-head">
+                <h2>Слоты тренеров</h2>
+            </div>
+            <div class="schedule-weeks compact-calendar">
+                {% for week in schedule_weeks %}
+                    <section class="schedule-week">
+                        <div class="schedule-week-head">
+                            <h3>{{ week.start|date:"d.m" }}-{{ week.end|date:"d.m" }}</h3>
+                            <span>{{ week.available_count }} свободно · {{ week.booked_count }} занято</span>
+                        </div>
+                        <div class="schedule-week-grid">
+                            {% for day in week.days %}
+                                <article class="schedule-day-card {% if day.is_today %}is-today{% endif %}">
+                                    <div class="schedule-day-head">
+                                        <span>{{ day.weekday }}</span>
+                                        <strong>{{ day.date|date:"d.m" }}</strong>
+                                    </div>
+                                    <div class="schedule-day-body">
+                                        {% for row in day.rows %}
+                                            <div class="schedule-time-chip {% if row.appointment %}is-booked{% else %}is-free{% endif %}">
+                                                <div>
+                                                    <strong>{{ row.slot.start_at|date:"H:i" }}-{{ row.slot.end_at|date:"H:i" }}</strong>
+                                                    <small>{{ row.slot.trainer.full_name }}</small>
+                                                    {% if row.appointment %}<small>{{ row.appointment.client.full_name }}</small>{% endif %}
+                                                </div>
+                                                {% if row.appointment %}
+                                                    <span class="status status-good">занято</span>
+                                                {% else %}
+                                                    <span class="status status-muted">свободно</span>
+                                                {% endif %}
+                                            </div>
+                                        {% empty %}
+                                            <span class="schedule-empty">Нет окон</span>
+                                        {% endfor %}
+                                    </div>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                {% empty %}
+                    <p class="muted">Будущих слотов нет.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+{% endif %}
+{% endblock %}

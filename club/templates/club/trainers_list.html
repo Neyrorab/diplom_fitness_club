@@ -1,0 +1,48 @@
+{% extends "club/base.html" %}
+{% load club_extras %}
+
+{% block title %}Тренеры{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Персонал</p>
+        <h1>Тренеры</h1>
+    </div>
+    <a class="btn btn-primary" href="{% url 'trainer_create' %}">Добавить тренера</a>
+</header>
+
+<section class="panel">
+    <form class="filters" method="get">
+        <input name="q" value="{{ query }}" placeholder="ФИО, специализация, телефон">
+        <button class="btn btn-primary" type="submit">Найти</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ФИО</th><th>Контакты</th><th>Специализация</th><th>Клиентов</th><th>Статус</th><th></th></tr></thead>
+            <tbody>
+            {% for trainer in trainers %}
+                <tr>
+                    <td>
+                        <div class="person-cell">
+                            <span class="avatar avatar-compact {{ trainer.full_name|avatar_variant }}">{{ trainer.full_name|initials }}</span>
+                            <span>{{ trainer.full_name }}</span>
+                        </div>
+                    </td>
+                    <td>{{ trainer.phone }}<br><small>{{ trainer.user.email }}</small></td>
+                    <td>{{ trainer.specialization }}</td>
+                    <td>{{ trainer.clients_total }}</td>
+                    <td><span class="status {{ trainer.status|status_class }}">{{ trainer.get_status_display }}</span></td>
+                    <td><a href="{% url 'trainer_edit' trainer.id %}">Редактировать</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty">Тренеры не найдены.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

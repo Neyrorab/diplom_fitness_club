@@ -1,0 +1,130 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}{{ plan.title }}{% endblock %}
+
+{% block content %}
+<header class="profile-hero plan-hero">
+    <div class="profile-hero-main">
+        <span class="avatar avatar-xl {{ plan.client.full_name|avatar_variant }}">{{ plan.client.full_name|initials }}</span>
+        <div>
+            <p class="eyebrow">Тренировочный план</p>
+            <h1>{{ plan.title }}</h1>
+            <div class="hero-pills">
+                <span>{{ plan.client.full_name }}</span>
+                <span>{{ plan.get_goal_display }}</span>
+                <span>{{ plan.completion_percent }}% выполнения</span>
+            </div>
+        </div>
+    </div>
+    <img class="profile-hero-image" src="{% static 'club/media/exercise-cardio.png' %}" alt="">
+    <a class="btn" href="{% url 'client_detail' plan.client.id %}?tab=workouts">К клиенту</a>
+</header>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>{{ plan.client.full_name }}</h2>
+        <span class="status {{ plan.status|status_class }}">{{ plan.get_status_display }}</span>
+    </div>
+    <dl class="info-grid">
+        <div><dt>Цель</dt><dd>{{ plan.get_goal_display }}</dd></div>
+        <div><dt>Тренер</dt><dd>{{ plan.trainer|default:"-" }}</dd></div>
+        <div><dt>Период</dt><dd>{{ plan.start_date|date:"d.m.Y" }}{% if plan.end_date %} - {{ plan.end_date|date:"d.m.Y" }}{% endif %}</dd></div>
+        <div><dt>Выполнение</dt><dd>{{ plan.completion_percent }}%</dd></div>
+    </dl>
+    {% if plan.description %}<p class="note">{{ plan.description }}</p>{% endif %}
+    <div class="progress"><span style="width: {{ plan.completion_percent }}%"></span></div>
+</section>
+
+<section class="workout-days">
+    {% for day in plan.days.all %}
+        <article class="panel">
+            <div class="panel-head">
+                <h2>{{ day.day_number }}. {{ day.title }}</h2>
+                {% if is_client_role and current_client.id == plan.client.id and not plan.is_template and plan.status == "active" %}
+                    <a class="btn btn-primary btn-small" href="{% url 'complete_workout' day.id %}">Выполнить</a>
+                {% endif %}
+            </div>
+            {% if day.description %}<p class="muted">{{ day.description }}</p>{% endif %}
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>#</th><th>Упражнение</th><th>Подходы</th><th>Повторы</th><th>Вес</th><th>Отдых</th><th>Комментарий</th></tr></thead>
+                    <tbody>
+                    {% for item in day.exercises.all %}
+                        <tr>
+                            <td>{{ item.order_number }}</td>
+                            <td>
+                                <div class="exercise-cell">
+                                    <span class="exercise-thumb {{ item.exercise.exercise_type|exercise_type_class }}"></span>
+                                    <span>{{ item.exercise.name }}<br><small>{{ item.exercise.muscle_group }}</small></span>
+                                </div>
+                            </td>
+                            <td>{{ item.sets_count }}</td>
+                            <td>{{ item.reps_count }}</td>
+                            <td>{{ item.recommended_weight }}</td>
+                            <td>{{ item.rest_seconds }} сек</td>
+                            <td>{{ item.comment|default:"-" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="empty">Упражнения не добавлены.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if is_admin_role or is_trainer_role %}
+                <details class="inline-form">
+                    <summary>Добавить упражнение</summary>
+                    <form method="post" action="{% url 'workout_exercise_create' day.id %}" class="form-grid compact">
+                        {% csrf_token %}
+                        {% for field in exercise_form %}
+                            <label>
+                                <span>{{ field.label }}</span>
+                                {{ field }}
+                            </label>
+                        {% endfor %}
+                        <button class="btn btn-primary wide" type="submit">Сохранить</button>
+                    </form>
+                </details>
+            {% endif %}
+        </article>
+    {% endfor %}
+</section>
+
+{% if is_admin_role or is_trainer_role %}
+    <section class="panel">
+        <div class="panel-head"><h2>Добавить тренировочный день</h2></div>
+        <form method="post" action="{% url 'workout_day_create' plan.id %}" class="form-grid compact">
+            {% csrf_token %}
+            {% for field in day_form %}
+                <label>
+                    <span>{{ field.label }}</span>
+                    {{ field }}
+                </label>
+            {% endfor %}
+            <button class="btn btn-primary wide" type="submit">Сохранить</button>
+        </form>
+    </section>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-head"><h2>История выполнения</h2></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Дата</th><th>Клиент</th><th>День</th><th>Самочувствие</th><th>Комментарий</th></tr></thead>
+            <tbody>
+            {% for workout in completed_workouts %}
+                <tr>
+                    <td>{{ workout.completed_at|date:"d.m.Y H:i" }}</td>
+                    <td>{{ workout.client.full_name }}</td>
+                    <td>{{ workout.workout_day.title }}</td>
+                    <td>{{ workout.mood|default:"-" }}</td>
+                    <td>{{ workout.comment|default:"-" }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty">Истории пока нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

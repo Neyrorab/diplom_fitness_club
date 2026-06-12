@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 836 528" role="img" aria-label="Fitness club pulse brain logo">
+    <defs>
+        <filter id="softShadow" x="-8%" y="-8%" width="116%" height="116%">
+            <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#0f766e" flood-opacity="0.14"/>
+        </filter>
+    </defs>
+    <g fill="none" stroke="#006b43" stroke-linecap="round" stroke-linejoin="round" filter="url(#softShadow)">
+        <g opacity="0.92" stroke-width="4">
+            <path d="M228 190 300 135 407 94 505 115 625 105 720 170 775 230"/>
+            <path d="M228 190 215 260 300 290 360 350 450 390 555 435 665 380 730 305 775 230"/>
+            <path d="M300 135 345 220 300 290 430 310 520 330 665 380"/>
+            <path d="M407 94 440 230 520 275 610 255 720 170"/>
+            <path d="M505 115 480 160 520 275 555 435"/>
+            <path d="M625 105 590 170 610 255 730 305"/>
+            <path d="M215 260 345 220 440 230 590 170 775 230"/>
+            <path d="M300 135 360 155 440 230 520 330 730 305"/>
+            <path d="M360 155 407 94 480 160 625 105"/>
+            <path d="M345 220 430 310 450 390 520 275"/>
+            <path d="M300 290 430 310 610 255 665 380"/>
+            <path d="M228 190 360 155 520 275 720 170"/>
+            <path d="M360 350 430 310 590 170 730 305"/>
+            <path d="M450 390 520 330 610 255 775 230"/>
+            <path d="M300 290 480 160 610 255"/>
+            <path d="M345 220 505 115 720 170"/>
+            <path d="M407 94 520 275 665 380"/>
+            <path d="M555 435 520 330 720 170"/>
+        </g>
+        <path d="M58 298H105C119 298 121 282 130 264C138 248 147 248 154 268L168 319L200 111L238 433L257 334C263 312 274 298 297 298H338C370 298 386 276 424 260C482 220 552 218 612 250C654 272 714 281 778 270" stroke="#0a8f55" stroke-width="20"/>
+    </g>
+    <g fill="#00784b" stroke="#f8f7f2" stroke-width="3">
+        <circle cx="228" cy="190" r="14"/>
+        <circle cx="300" cy="135" r="14"/>
+        <circle cx="407" cy="94" r="14"/>
+        <circle cx="505" cy="115" r="14"/>
+        <circle cx="625" cy="105" r="14"/>
+        <circle cx="720" cy="170" r="14"/>
+        <circle cx="775" cy="230" r="14"/>
+        <circle cx="730" cy="305" r="14"/>
+        <circle cx="665" cy="380" r="14"/>
+        <circle cx="555" cy="435" r="14"/>
+        <circle cx="450" cy="390" r="14"/>
+        <circle cx="360" cy="350" r="14"/>
+        <circle cx="300" cy="290" r="14"/>
+        <circle cx="215" cy="260" r="14"/>
+        <circle cx="345" cy="220" r="14"/>
+        <circle cx="440" cy="230" r="14"/>
+        <circle cx="520" cy="275" r="14"/>
+        <circle cx="610" cy="255" r="14"/>
+        <circle cx="635" cy="330" r="14"/>
+        <circle cx="520" cy="330" r="14"/>
+        <circle cx="430" cy="310" r="14"/>
+        <circle cx="590" cy="170" r="14"/>
+        <circle cx="700" cy="260" r="14"/>
+        <circle cx="360" cy="155" r="14"/>
+        <circle cx="480" cy="160" r="14"/>
+    </g>
+</svg>

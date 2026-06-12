@@ -1,0 +1,326 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}Дашборды администратора{% endblock %}
+
+{% block content %}
+<header class="club-hero analytics-hero">
+    <div class="club-hero-copy">
+        <p class="eyebrow">Бизнес-аналитика</p>
+        <h1>Дашборды администратора</h1>
+        <p class="hero-lead">Сводка по активности клуба, рискам ухода, абонементам и загрузке тренеров.</p>
+        <div class="hero-pills">
+            <span>{{ metrics.total_clients }} клиентов</span>
+            <span>{{ business_kpis.workouts_30 }} тренировок</span>
+            <span>{{ business_kpis.average_completion }}% выполнение</span>
+        </div>
+    </div>
+    <div class="club-hero-media">
+        <img src="{% static 'club/media/studio-hero.png' %}" alt="">
+        <div class="hero-floating-card">
+            <strong>{{ business_kpis.risk_count }}</strong>
+            <span>в зоне риска</span>
+        </div>
+    </div>
+    <div class="actions">
+        <a class="btn" href="{% url 'reports' %}">К отчетам</a>
+        <a class="btn btn-primary" href="#management-ai">ИИ-анализ</a>
+    </div>
+</header>
+
+<section class="business-kpi-grid">
+    <article class="business-kpi">
+        <span>Клиентов в базе</span>
+        <strong>{{ metrics.total_clients }}</strong>
+        <small>{{ metrics.active_clients }} активных</small>
+    </article>
+    <article class="business-kpi">
+        <span>Тренировок за 30 дней</span>
+        <strong>{{ business_kpis.workouts_30 }}</strong>
+        <small>{{ business_kpis.avg_workouts }} на клиента</small>
+    </article>
+    <article class="business-kpi">
+        <span>Среднее выполнение планов</span>
+        <strong>{{ business_kpis.average_completion }}%</strong>
+        <small>по активным программам</small>
+    </article>
+    <article class="business-kpi">
+        <span>Средняя оценка тренеров</span>
+        <strong>{{ business_kpis.trainer_average_rating }}/5</strong>
+        <small>{{ business_kpis.trainer_reviews_count }} оценок</small>
+    </article>
+    <article class="business-kpi danger">
+        <span>Клиентов в зоне риска</span>
+        <strong>{{ business_kpis.risk_count }}</strong>
+        <small>{{ business_kpis.expiring_count }} абонементов истекает</small>
+    </article>
+</section>
+
+<section id="management-ai" class="panel management-ai-panel">
+    <div class="panel-head">
+        <div>
+            <h2>ИИ-анализ управления</h2>
+            <p class="muted">Провайдер: {{ management_ai_provider }} · модель: {{ management_ai_model }} · источник: метрики админского дашборда</p>
+        </div>
+        <form method="post" class="inline-action-form management-ai-action-form" action="{% url 'management_ai_analysis_start' %}">
+            {% csrf_token %}
+            <label class="ai-provider-picker">
+                <span>Агрегатор</span>
+                <select name="provider" aria-label="Агрегатор ИИ">
+                    {% for provider in management_ai_providers %}
+                        <option value="{{ provider.value }}" {% if provider.value == management_ai_selected_provider %}selected{% endif %}>{{ provider.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="ai-provider-picker">
+                <span>Модель</span>
+                <select name="model_tier" aria-label="Профиль модели ИИ">
+                    {% for tier in management_ai_model_tiers %}
+                        <option value="{{ tier.value }}" {% if tier.value == management_ai_selected_model_tier %}selected{% endif %}>{{ tier.label }} · {{ tier.description }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Сформировать рекомендации</button>
+        </form>
+    </div>
+
+    {% if ai_analysis and ai_analysis.is_pending %}
+        <div
+            class="management-ai-loading"
+            data-management-ai-loading
+            data-status-url="{{ ai_analysis_status_url }}"
+        >
+            <div class="ai-loading-head">
+                <span class="status status-good">{{ ai_analysis.get_status_display }}</span>
+                <small>задание #{{ ai_analysis.id }} · {{ ai_analysis.created_at|date:"d.m.Y H:i" }}</small>
+            </div>
+            <h3>Готовим управленческие рекомендации</h3>
+            <p data-ai-status-text>Метрики уже сохранены. Когда результат будет готов, страница обновится автоматически.</p>
+            <div class="ai-loading-track" aria-hidden="true"><span></span></div>
+        </div>
+    {% elif ai_management_error %}
+        <p class="note">{{ ai_management_error }}</p>
+    {% elif ai_management %}
+        <div class="ai-management-summary">
+            <div class="ai-management-summary-head">
+                <strong>Вывод</strong>
+                {% if ai_management.health_score %}
+                    <span class="status status-good">индекс {{ ai_management.health_score }}/100</span>
+                {% endif %}
+            </div>
+            <p>{{ ai_management.summary|default:"ИИ вернул пустой вывод. Повторите анализ или проверьте ответ API." }}</p>
+            <span class="status status-muted">{{ ai_management.model }}</span>
+        </div>
+
+        {% if ai_management.priority_actions %}
+            <div class="recommendation-list management-recommendations">
+                {% for item in ai_management.priority_actions %}
+                    <article class="recommendation-card priority-{{ item.priority|default:'medium' }}">
+                        <div class="recommendation-top">
+                            <span>{{ item.metric|default:"управление" }}</span>
+                            <strong>{{ item.priority|default:"medium" }}</strong>
+                        </div>
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.action }}</p>
+                        <dl class="ai-action-meta">
+                            {% if item.expected_effect %}<div><dt>Эффект</dt><dd>{{ item.expected_effect }}</dd></div>{% endif %}
+                            {% if item.owner %}<div><dt>Ответственный</dt><dd>{{ item.owner }}</dd></div>{% endif %}
+                            {% if item.deadline %}<div><dt>Срок</dt><dd>{{ item.deadline }}</dd></div>{% endif %}
+                        </dl>
+                    </article>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="dashboard-grid ai-management-grid">
+            <article class="mini-card">
+                <h3>Риски и контроль</h3>
+                <ul class="plain-list">
+                    {% for risk in ai_management.risks %}
+                        <li>
+                            <strong>{{ risk.title }}</strong>
+                            <span>{{ risk.detail }}</span>
+                            {% if risk.signal %}<small>Сигнал: {{ risk.signal }}</small>{% endif %}
+                            {% if risk.mitigation %}<small>Что сделать: {{ risk.mitigation }}</small>{% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="muted">Критичных рисков не выделено.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Фокус тренеров</h3>
+                <ul class="plain-list">
+                    {% for item in ai_management.trainer_actions %}
+                        <li>
+                            <strong>{{ item.trainer }}</strong>
+                            {% if item.focus %}<span>{{ item.focus }}</span>{% endif %}
+                            <small>{{ item.action }}</small>
+                        </li>
+                    {% empty %}
+                        <li class="muted">Нет отдельных действий для тренеров.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Рост клуба</h3>
+                <ul class="plain-list">
+                    {% for item in ai_management.growth_actions %}
+                        <li>
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.action }}</span>
+                            {% if item.metric %}<small>Метрика: {{ item.metric }}</small>{% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="muted">Нет отдельных идей роста.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>План на 7 дней</h3>
+                <ul class="plain-list">
+                    {% for action in ai_management.next_7_days %}
+                        <li>{{ action }}</li>
+                    {% empty %}
+                        <li class="muted">Нет отдельного недельного плана.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+        </div>
+    {% else %}
+        <div class="signal-grid management-ai-preview">
+            <article class="signal-card signal-good">
+                <span>В анализ уйдет</span>
+                <strong>{{ business_kpis.workouts_30 }}</strong>
+                <small>тренировок за 30 дней</small>
+            </article>
+            <article class="signal-card signal-warn">
+                <span>Фокус риска</span>
+                <strong>{{ business_kpis.risk_count }}</strong>
+                <small>клиентов требуют внимания</small>
+            </article>
+            <article class="signal-card">
+                <span>Загрузка</span>
+                <strong>{{ trainer_load|length }}</strong>
+                <small>тренеров в отчете</small>
+            </article>
+        </div>
+    {% endif %}
+</section>
+
+<section class="analytics-grid">
+    <article class="panel analytics-wide">
+        <div class="panel-head">
+            <h2>Активность клуба по неделям</h2>
+            <span class="status status-good">8 недель</span>
+        </div>
+        <canvas class="chart tall" data-chart="line" data-chart-key="activity" height="270"></canvas>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Цели клиентов</h2>
+        </div>
+        <canvas class="chart tall" data-chart="bar" data-chart-key="goals" height="270"></canvas>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Статусы абонементов</h2>
+        </div>
+        <canvas class="chart tall" data-chart="donut" data-chart-key="memberships" height="270"></canvas>
+    </article>
+
+    <article class="panel analytics-wide">
+        <div class="panel-head">
+            <h2>Загрузка тренеров</h2>
+        </div>
+        <canvas class="chart tall" data-chart="groupedBar" data-chart-key="trainerLoad" height="270"></canvas>
+    </article>
+
+    <article class="panel analytics-wide">
+        <div class="panel-head">
+            <h2>Причины риска ухода</h2>
+        </div>
+        <canvas class="chart tall" data-chart="donut" data-chart-key="risk" height="270"></canvas>
+    </article>
+</section>
+
+<section class="dashboard-grid">
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Клиенты для контакта</h2>
+            <a class="btn btn-small" href="{% url 'clients_list' %}?activity=low">Открыть список</a>
+        </div>
+        <ul class="plain-list">
+            {% for row in risk_clients %}
+                <li>
+                    <div class="person-list-item">
+                        <span class="avatar avatar-compact {{ row.client.full_name|avatar_variant }}">{{ row.client.full_name|initials }}</span>
+                        <span>
+                            <a href="{% url 'client_detail' row.client.id %}">{{ row.client.full_name }}</a>
+                            <small>{{ row.client.trainer|default:"тренер не назначен" }}</small>
+                        </span>
+                    </div>
+                    <span>{{ row.reason }}</span>
+                </li>
+            {% empty %}
+                <li class="muted">Критичных клиентов нет.</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Тренеры</h2>
+        </div>
+        <ul class="trainer-load-list">
+            {% for row in trainer_load %}
+                <li>
+                    <div class="trainer-load-head">
+                        <span class="person-cell">
+                            <span class="avatar avatar-compact {{ row.trainer.full_name|avatar_variant }}">{{ row.trainer.full_name|initials }}</span>
+                            <span>
+                                {{ row.trainer.full_name }}
+                                <small>
+                                    {% if row.reviews_count %}
+                                        рейтинг {{ row.average_rating }}/5 · {{ row.reviews_count }} оценок
+                                    {% else %}
+                                        оценок пока нет
+                                    {% endif %}
+                                </small>
+                            </span>
+                        </span>
+                        <strong>{{ row.clients_count }}</strong>
+                    </div>
+                    <div class="progress"><span style="width: {% widthratio row.active_count row.clients_count 100 %}%"></span></div>
+                    <small>{{ row.active_count }} активных · {{ row.low_activity_count }} в зоне риска</small>
+                </li>
+            {% empty %}
+                <li class="muted">Нет данных.</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Популярные цели</h2>
+        </div>
+        <ul class="plain-list metric-list">
+            {% for row in goal_stats %}
+                <li><span>{{ row.goal }}</span><strong>{{ row.count }}</strong></li>
+            {% empty %}
+                <li class="muted">Нет данных.</li>
+            {% endfor %}
+        </ul>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.dashboardCharts = {{ dashboard_charts|safe }};
+</script>
+<script src="{% static 'club/charts.js' %}?v=20260606-y-axis-density"></script>
+<script src="{% static 'club/management_ai.js' %}"></script>
+{% endblock %}

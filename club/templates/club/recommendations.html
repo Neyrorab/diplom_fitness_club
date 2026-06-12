@@ -1,0 +1,260 @@
+{% extends "club/base.html" %}
+{% load static club_extras %}
+
+{% block title %}ИИ-рекомендации{% endblock %}
+
+{% block content %}
+<header class="profile-hero recommendations-hero">
+    <div class="profile-hero-main">
+        <span class="avatar avatar-xl {{ client.full_name|avatar_variant }}">{{ client.full_name|initials }}</span>
+        <div>
+            <p class="eyebrow">Рекомендательная система</p>
+            <h1>ИИ-рекомендации</h1>
+            <div class="hero-pills">
+                <span>{{ client.full_name }}</span>
+                <span>{{ recommendations.score }} индекс</span>
+                <span>{{ recommendations.items|length }} пунктов</span>
+            </div>
+        </div>
+    </div>
+    <img class="profile-hero-image" src="{% static 'club/media/progress-checkin.svg' %}" alt="">
+    <a class="btn" href="{% url 'client_detail' client.id %}?tab=recommendations">К карточке</a>
+</header>
+
+<section class="recommendation-hero">
+    <article class="panel ai-panel">
+        <div class="panel-head">
+            <div>
+                <h2>{{ client.full_name }}</h2>
+                <p class="muted">Советы рассчитаны на основе текущей цели, прогресса, питания, тренировок и абонемента.</p>
+            </div>
+            <span class="status status-good">обновлено {{ recommendations.generated_at|date:"d.m.Y H:i" }}</span>
+        </div>
+        <div class="ai-score large-score">
+            <strong>{{ recommendations.score }}</strong>
+            <span>индекс сопровождения</span>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Ключевые сигналы</h2>
+        </div>
+        <div class="signal-grid">
+            {% for signal in recommendations.signals %}
+                <div class="signal-card signal-{{ signal.state }}">
+                    <span>{{ signal.label }}</span>
+                    <strong>{{ signal.value }}</strong>
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+{% if client_ai_providers %}
+<section id="client-ai" class="panel management-ai-panel client-ai-panel">
+    <div class="panel-head">
+        <div>
+            <h2>ИИ-коуч клиента</h2>
+            <p class="muted">Провайдер: {{ client_ai_provider }} · модель: {{ client_ai_model }} · источник: тренировки, питание, прогресс, запись и абонемент</p>
+        </div>
+        <form method="post" class="inline-action-form management-ai-action-form" action="{% url 'client_ai_analysis_start' %}">
+            {% csrf_token %}
+            <label class="ai-provider-picker">
+                <span>Агрегатор</span>
+                <select name="provider" aria-label="Агрегатор ИИ">
+                    {% for provider in client_ai_providers %}
+                        <option value="{{ provider.value }}" {% if provider.value == client_ai_selected_provider %}selected{% endif %}>{{ provider.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="ai-provider-picker">
+                <span>Модель</span>
+                <select name="model_tier" aria-label="Профиль модели ИИ">
+                    {% for tier in client_ai_model_tiers %}
+                        <option value="{{ tier.value }}" {% if tier.value == client_ai_selected_model_tier %}selected{% endif %}>{{ tier.label }} · {{ tier.description }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Сформировать личный план</button>
+        </form>
+    </div>
+
+    {% if client_ai_analysis and client_ai_analysis.is_pending %}
+        <div
+            class="management-ai-loading"
+            data-ai-loading
+            data-status-url="{{ client_ai_analysis_status_url }}"
+            data-queued-text="Задание ждет запуска. Данные личного кабинета сохранены, страницу можно покинуть."
+            data-running-text="Модель анализирует тренировки, питание, прогресс, запись и абонемент."
+            data-retry-text="Проверяем статус фонового анализа. Обновление продолжится автоматически."
+        >
+            <div class="ai-loading-head">
+                <span class="status status-good">{{ client_ai_analysis.get_status_display }}</span>
+                <small>задание #{{ client_ai_analysis.id }} · {{ client_ai_analysis.created_at|date:"d.m.Y H:i" }}</small>
+            </div>
+            <h3>Готовим персональный план на неделю</h3>
+            <p data-ai-status-text>Запрос выполняется в фоне. Когда результат будет готов, страница обновится автоматически.</p>
+            <div class="ai-loading-track" aria-hidden="true"><span></span></div>
+        </div>
+    {% elif client_ai_error %}
+        <p class="note">{{ client_ai_error }}</p>
+    {% elif client_ai %}
+        <div class="ai-management-summary">
+            <div class="ai-management-summary-head">
+                <strong>Фокус недели</strong>
+                {% if client_ai.readiness_score %}
+                    <span class="status status-good">индекс {{ client_ai.readiness_score }}/100</span>
+                {% endif %}
+            </div>
+            <p>{{ client_ai.summary|default:"ИИ вернул пустой вывод. Повторите анализ или проверьте ответ API." }}</p>
+            <span class="status status-muted">{{ client_ai.model }}</span>
+        </div>
+
+        {% if client_ai.priority_steps %}
+            <div class="recommendation-list management-recommendations client-ai-recommendations">
+                {% for item in client_ai.priority_steps %}
+                    <article class="recommendation-card priority-{{ item.priority|default:'medium' }}">
+                        <div class="recommendation-top">
+                            <span>{{ item.category|default:"общее" }}</span>
+                            <strong>{{ item.priority|default:"medium" }}</strong>
+                        </div>
+                        <h3>{{ item.title }}</h3>
+                        {% if item.reason %}<p>{{ item.reason }}</p>{% endif %}
+                        <dl class="ai-action-meta">
+                            <div><dt>Действие</dt><dd>{{ item.action }}</dd></div>
+                            {% if item.deadline %}<div><dt>Срок</dt><dd>{{ item.deadline }}</dd></div>{% endif %}
+                            {% if item.evidence %}<div><dt>Основание</dt><dd>{{ item.evidence }}</dd></div>{% endif %}
+                        </dl>
+                    </article>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="dashboard-grid ai-management-grid">
+            <article class="mini-card">
+                <h3>Тренировки</h3>
+                <ul class="plain-list">
+                    {% for item in client_ai.workout_focus %}
+                        <li>
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.action }}</span>
+                            {% if item.why %}<small>{{ item.why }}</small>{% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="muted">Нет отдельного фокуса по тренировкам.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Питание</h3>
+                <ul class="plain-list">
+                    {% for item in client_ai.nutrition_focus %}
+                        <li>
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.action }}</span>
+                            {% if item.why %}<small>{{ item.why }}</small>{% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="muted">Нет отдельного фокуса по питанию.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Прогресс</h3>
+                <ul class="plain-list">
+                    {% for item in client_ai.progress_focus %}
+                        <li>
+                            <strong>{{ item.title }}</strong>
+                            <span>{{ item.action }}</span>
+                            {% if item.why %}<small>{{ item.why }}</small>{% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="muted">Нет отдельного фокуса по прогрессу.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card">
+                <h3>Вопросы тренеру</h3>
+                <ul class="plain-list">
+                    {% for question in client_ai.questions_for_trainer %}
+                        <li>{{ question }}</li>
+                    {% empty %}
+                        <li class="muted">Нет отдельных вопросов.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            <article class="mini-card trainer-ai-week">
+                <h3>План на 7 дней</h3>
+                <ul class="plain-list">
+                    {% for action in client_ai.next_7_days %}
+                        <li>{{ action }}</li>
+                    {% empty %}
+                        <li class="muted">Нет отдельного недельного плана.</li>
+                    {% endfor %}
+                </ul>
+            </article>
+        </div>
+    {% else %}
+        <div class="signal-grid management-ai-preview">
+            <article class="signal-card signal-good">
+                <span>Индекс сопровождения</span>
+                <strong>{{ client_ai_payload.local_recommendations.score }}</strong>
+                <small>локальная база для анализа</small>
+            </article>
+            <article class="signal-card signal-warn">
+                <span>Тренировок за 30 дней</span>
+                <strong>{{ client_ai_payload.workouts.workouts_30_days }}</strong>
+                <small>регулярность и активность</small>
+            </article>
+            <article class="signal-card">
+                <span>Питание за неделю</span>
+                <strong>{{ client_ai_payload.nutrition.days_with_food }}</strong>
+                <small>дней с заполненным дневником</small>
+            </article>
+            <article class="signal-card">
+                <span>План</span>
+                <strong>{% if client_ai_payload.active_plan %}{{ client_ai_payload.active_plan.completion_percent }}%{% else %}-{% endif %}</strong>
+                <small>выполнение активной программы</small>
+            </article>
+        </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Рекомендации</h2>
+        <span class="status status-muted">{{ recommendations.items|length }} пунктов</span>
+    </div>
+    <div class="recommendation-list">
+        {% for item in recommendations.items %}
+            <article class="recommendation-card priority-{{ item.priority }}">
+                <div class="recommendation-top">
+                    <span>{{ item.category }}</span>
+                    <strong>{% if item.priority == "high" %}Высокий приоритет{% elif item.priority == "medium" %}Средний приоритет{% else %}Низкий приоритет{% endif %}</strong>
+                </div>
+                <h3>{{ item.title }}</h3>
+                <dl>
+                    <div>
+                        <dt>Почему</dt>
+                        <dd>{{ item.reason }}</dd>
+                    </div>
+                    <div>
+                        <dt>Что сделать</dt>
+                        <dd>{{ item.action }}</dd>
+                    </div>
+                </dl>
+            </article>
+        {% empty %}
+            <p class="empty">Рекомендаций пока нет.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if client_ai_providers %}
+<script src="{% static 'club/management_ai.js' %}"></script>
+{% endif %}
+{% endblock %}
