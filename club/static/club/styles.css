@@ -1628,10 +1628,45 @@ dd {
     gap: 18px;
 }
 
+.reviews-list-panel {
+    display: flex;
+    max-height: min(680px, calc(100vh - 190px));
+    min-height: 0;
+    flex-direction: column;
+}
+
 .reviews-list {
     display: grid;
     gap: 14px;
     margin-top: 16px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 8px;
+    scrollbar-gutter: stable;
+}
+
+.reviews-list::-webkit-scrollbar,
+.review-form-panel::-webkit-scrollbar {
+    width: 10px;
+}
+
+.reviews-list::-webkit-scrollbar-track,
+.review-form-panel::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background: rgba(223, 229, 220, 0.72);
+}
+
+.reviews-list::-webkit-scrollbar-thumb,
+.review-form-panel::-webkit-scrollbar-thumb {
+    border: 2px solid rgba(223, 229, 220, 0.72);
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.48);
+}
+
+.reviews-list::-webkit-scrollbar-thumb:hover,
+.review-form-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 118, 110, 0.68);
 }
 
 .review-card {
@@ -1693,6 +1728,10 @@ dd {
 .review-form-panel {
     position: sticky;
     top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 .review-form-section + .review-form-section,
@@ -2755,6 +2794,18 @@ dd {
 
     .review-form-panel {
         position: static;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .reviews-list-panel {
+        max-height: none;
+    }
+
+    .reviews-list {
+        overflow: visible;
+        padding-right: 0;
+        scrollbar-gutter: auto;
     }
 
     .profile-hero-image,
