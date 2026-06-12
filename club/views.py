@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Avg, Count, Max, Q
+from django.db.models import Avg, Count, F, Max, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -373,7 +373,7 @@ def clients_list(request):
         clients = clients.filter(completed_workouts__completed_at__date__gte=timezone.localdate() - timedelta(days=30)).distinct()
 
     context = {
-        "clients": clients.select_related("trainer", "user"),
+        "clients": clients.select_related("trainer", "user").annotate(last_activity_at=Max("completed_workouts__completed_at")),
         "trainers": TrainerProfile.objects.filter(status="active"),
         "filters": {"q": query, "status": status, "trainer": trainer_id, "activity": activity},
         "statuses": ClientProfile._meta.get_field("status").choices,
@@ -553,7 +553,7 @@ def schedule_page(request):
             status=AppointmentStatus.BOOKED,
             slot__start_at__date__gte=today,
         ).select_related("slot", "client", "client__trainer").order_by("slot__start_at")[:30]
-        attach_completion_days(appointments)
+        appointments = attach_completion_days(appointments)
         rows = schedule_slot_rows(slots[:60])
         context = {
             "schedule_role": "trainer",
@@ -572,7 +572,7 @@ def schedule_page(request):
             status=AppointmentStatus.BOOKED,
             slot__start_at__date__gte=today,
         ).select_related("slot", "slot__trainer").order_by("slot__start_at")[:20]
-        attach_completion_days(appointments)
+        appointments = attach_completion_days(appointments)
         available_slots = ScheduleSlot.objects.filter(
             trainer=client.trainer,
             is_active=True,
@@ -596,7 +596,7 @@ def schedule_page(request):
             status=AppointmentStatus.BOOKED,
             slot__start_at__date__gte=today,
         ).select_related("slot", "slot__trainer", "client", "client__trainer").order_by("slot__start_at")[:40]
-        attach_completion_days(appointments)
+        appointments = attach_completion_days(appointments)
         rows = schedule_slot_rows(slots[:80])
         context = {
             "schedule_role": "admin",
@@ -1030,7 +1030,7 @@ def recommendations_page(request, client_id=None):
     recommendations = build_client_recommendations(client)
     context = {"client": client, "recommendations": recommendations}
     if is_client(request.user) and client_profile_for(request.user) == client:
-        context.update(client_recommendations_ai_context(request, client))
+        context.update(client_recommendations_ai_context(request, client, recommendations))
     return render_app(
         request,
         "club/recommendations.html",
@@ -1253,7 +1253,7 @@ def trainer_ai_analysis_for_dashboard(request, trainer):
 
 
 def trainer_dashboard_ai_context(request, trainer):
-    payload = build_trainer_ai_payload(trainer)
+    payload = trainer_ai_preview_payload(trainer)
     selected_provider = default_management_ai_provider()
     selected_model_tier = default_management_ai_model_tier()
     provider_label, model = management_ai_provider_context(selected_provider, selected_model_tier)
@@ -1281,6 +1281,54 @@ def trainer_dashboard_ai_context(request, trainer):
     return context
 
 
+def trainer_ai_preview_payload(trainer):
+    today = timezone.localdate()
+    activity_border = today - timedelta(days=30)
+    inactive_border = today - timedelta(days=14)
+    clients = list(
+        trainer.clients.prefetch_related("memberships").annotate(
+            last_activity_at=Max("completed_workouts__completed_at"),
+            workouts_30_days=Count(
+                "completed_workouts",
+                filter=Q(completed_workouts__completed_at__date__gte=activity_border),
+                distinct=True,
+            ),
+            active_plans_count=Count(
+                "workout_plans",
+                filter=Q(workout_plans__status=PlanStatus.ACTIVE, workout_plans__is_template=False),
+                distinct=True,
+            ),
+        )
+    )
+    active_30 = len([client for client in clients if client.workouts_30_days])
+    contact_today = len(
+        [
+            client
+            for client in clients
+            if client.last_workout_at() is None or client.last_workout_at().date() < inactive_border
+        ]
+    )
+    plan_adjustment = len([client for client in clients if client.active_plans_count == 0])
+    renewal_support = len(
+        [
+            client
+            for client in clients
+            if (membership := client.current_membership()) and membership.status == MembershipStatus.ACTIVE and membership.expires_soon
+        ]
+    )
+    return {
+        "trainer": {
+            "clients_count": len(clients),
+            "active_clients_30_days": active_30,
+        },
+        "scenario_counts": {
+            "contact_today": contact_today,
+            "plan_adjustment": plan_adjustment,
+            "renewal_support": renewal_support,
+        },
+    }
+
+
 def client_ai_analysis_for_recommendations(request, client):
     analyses = ClientAIAnalysis.objects.filter(requested_by=request.user, client=client)
     analysis_id = request.GET.get("client_analysis")
@@ -1289,8 +1337,8 @@ def client_ai_analysis_for_recommendations(request, client):
     return mark_stale_analysis_failed(analyses.first(), "ИИ-коуч клиента")
 
 
-def client_recommendations_ai_context(request, client):
-    payload = build_client_ai_payload(client)
+def client_recommendations_ai_context(request, client, recommendations=None):
+    payload = build_client_ai_payload(client, recommendations=recommendations)
     selected_provider = default_management_ai_provider()
     selected_model_tier = CLIENT_AI_DEFAULT_MODEL_TIER
     provider_label, model = management_ai_provider_context(selected_provider, selected_model_tier)
@@ -1459,10 +1507,19 @@ def progress_records_for_period(client, period):
 
 def chart_progress_records_by_date(client, period, today=None):
     start_date, end_date = client_chart_date_bounds(period, today)
+    cache = getattr(client, "_progress_records_by_period_cache", None)
+    cache_key = (start_date, end_date)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
     records_by_date = {}
     records = client.progress_records.filter(record_date__range=(start_date, end_date)).order_by("record_date", "id")
     for record in records:
         records_by_date[record.record_date] = record
+    if cache is None:
+        cache = {}
+        client._progress_records_by_period_cache = cache
+    cache[cache_key] = records_by_date
     return records_by_date
 
 
@@ -1485,10 +1542,10 @@ def progress_chart_data(client, period=DEFAULT_CLIENT_CHART_PERIOD):
 
 
 def client_physical_summary(client):
-    records = list(client.progress_records.all())
-    latest = records[-1] if records else None
-    first = records[0] if records else None
-    previous = records[-2] if len(records) > 1 else first
+    first = client.progress_records.order_by("record_date", "id").first()
+    latest_records = list(client.progress_records.order_by("-record_date", "-id")[:2])
+    latest = latest_records[0] if latest_records else None
+    previous = latest_records[1] if len(latest_records) > 1 else first
 
     def value(record, attr):
         item = getattr(record, attr, None) if record else None
@@ -1646,18 +1703,20 @@ def client_dashboard_charts(client, period=DEFAULT_CLIENT_CHART_PERIOD):
 
 def workout_regularity_chart(client, today, period=DEFAULT_CLIENT_CHART_PERIOD):
     start_date, end_date = client_chart_date_bounds(period, today)
+    workout_days = [
+        timezone.localtime(completed_at).date()
+        for completed_at in CompletedWorkout.objects.filter(
+            client=client,
+            completed_at__date__range=(start_date, end_date),
+        ).values_list("completed_at", flat=True)
+    ]
     labels = []
     values = []
     week_start = start_date
     while week_start <= end_date:
         week_end = min(week_start + timedelta(days=6), end_date)
         labels.append(f"{week_start:%d.%m}-{week_end:%d.%m}")
-        values.append(
-            CompletedWorkout.objects.filter(
-                client=client,
-                completed_at__date__range=(week_start, week_end),
-            ).count()
-        )
+        values.append(sum(1 for workout_day in workout_days if week_start <= workout_day <= week_end))
         week_start = week_end + timedelta(days=1)
     chart_values = values if any(values) else [None for _ in values]
     return {
@@ -1764,8 +1823,19 @@ def admin_dashboard_context(clients):
     risk_rows = risk_clients(clients)
     last_30_days = today - timedelta(days=30)
     workouts_30 = CompletedWorkout.objects.filter(completed_at__date__gte=last_30_days)
-    active_plans = WorkoutPlan.objects.filter(is_template=False, status="active").prefetch_related("days")
-    completion_values = [plan.completion_percent() for plan in active_plans]
+    active_plans = WorkoutPlan.objects.filter(is_template=False, status="active").annotate(
+        total_days_count=Count("days", distinct=True),
+        completed_days_count=Count(
+            "days",
+            filter=Q(days__completed_workouts__client_id=F("client_id"), days__completed_workouts__exercises__is_completed=True),
+            distinct=True,
+        ),
+    )
+    completion_values = [
+        round(plan.completed_days_count / plan.total_days_count * 100)
+        for plan in active_plans
+        if plan.total_days_count
+    ]
     average_completion = round(sum(completion_values) / len(completion_values), 1) if completion_values else 0
     total_clients = clients.count()
     avg_workouts = round(workouts_30.count() / total_clients, 1) if total_clients else 0
@@ -1985,13 +2055,21 @@ def weekly_activity_chart(today):
     labels = []
     workout_values = []
     client_values = []
+    first_week_end = today - timedelta(days=7 * 7)
+    first_week_start = first_week_end - timedelta(days=6)
+    workout_rows = [
+        (timezone.localtime(completed_at).date(), client_id)
+        for completed_at, client_id in CompletedWorkout.objects.filter(
+            completed_at__date__range=(first_week_start, today)
+        ).values_list("completed_at", "client_id")
+    ]
     for offset in range(7, -1, -1):
         week_end = today - timedelta(days=offset * 7)
         week_start = week_end - timedelta(days=6)
-        workouts = CompletedWorkout.objects.filter(completed_at__date__range=(week_start, week_end))
+        week_rows = [row for row in workout_rows if week_start <= row[0] <= week_end]
         labels.append(week_start.strftime("%d.%m"))
-        workout_values.append(workouts.count())
-        client_values.append(workouts.values("client_id").distinct().count())
+        workout_values.append(len(week_rows))
+        client_values.append(len({client_id for _, client_id in week_rows}))
     return {
         "labels": labels,
         "datasets": [
@@ -2036,7 +2114,9 @@ def risk_clients(clients):
     inactive_border = timezone.localdate() - timedelta(days=14)
     today = timezone.localdate()
     result = []
-    for client in clients.select_related("trainer").prefetch_related("memberships"):
+    for client in clients.select_related("trainer").prefetch_related("memberships").annotate(
+        last_activity_at=Max("completed_workouts__completed_at")
+    ):
         last = client.last_workout_at()
         membership = client.current_membership()
         reasons = []
@@ -2052,18 +2132,28 @@ def risk_clients(clients):
 
 
 def trainer_load_report(clients):
+    client_rows = list(
+        clients.select_related("trainer").annotate(last_activity_at=Max("completed_workouts__completed_at"))
+    )
+    trainer_ids = {client.trainer_id for client in client_rows if client.trainer_id}
+    review_rows = {
+        row["trainer_id"]: row
+        for row in TrainerReview.objects.filter(is_published=True, trainer_id__in=trainer_ids)
+        .values("trainer_id")
+        .annotate(avg=Avg("rating"), count=Count("id"))
+    }
     rows = []
-    for trainer in trainer_load_queryset(clients):
-        trainer_clients = clients.filter(trainer=trainer)
-        review_stats = trainer.trainer_reviews.filter(is_published=True).aggregate(avg=Avg("rating"), count=Count("id"))
+    for trainer in TrainerProfile.objects.filter(id__in=trainer_ids).order_by("full_name"):
+        trainer_clients = [client for client in client_rows if client.trainer_id == trainer.id]
+        review_stats = review_rows.get(trainer.id, {})
         rows.append(
             {
                 "trainer": trainer,
-                "clients_count": trainer_clients.count(),
-                "active_count": trainer_clients.filter(status="active").count(),
+                "clients_count": len(trainer_clients),
+                "active_count": len([client for client in trainer_clients if client.status == "active"]),
                 "low_activity_count": len([client for client in trainer_clients if client.is_low_activity()]),
-                "average_rating": round(review_stats["avg"] or 0, 1),
-                "reviews_count": review_stats["count"] or 0,
+                "average_rating": round(review_stats.get("avg") or 0, 1),
+                "reviews_count": review_stats.get("count") or 0,
             }
         )
     return rows
@@ -2150,9 +2240,43 @@ def schedule_stats(slot_rows, appointments):
 
 
 def attach_completion_days(appointments):
+    appointments = list(appointments)
+    client_ids = {appointment.client_id for appointment in appointments}
+    if not client_ids:
+        return appointments
+
+    plans_by_client = {}
+    plans = (
+        WorkoutPlan.objects.filter(client_id__in=client_ids, status=PlanStatus.ACTIVE, is_template=False)
+        .prefetch_related("days__exercises__exercise")
+        .order_by("client_id", "-start_date")
+    )
+    for plan in plans:
+        plans_by_client.setdefault(plan.client_id, plan)
+
+    completed_days_by_client = {client_id: set() for client_id in client_ids}
+    if plans_by_client:
+        completed_rows = (
+            CompletedWorkout.objects.filter(
+                client_id__in=client_ids,
+                workout_day__workout_plan_id__in=[plan.id for plan in plans_by_client.values()],
+                exercises__is_completed=True,
+            )
+            .values_list("client_id", "workout_day_id")
+            .distinct()
+        )
+        for client_id, workout_day_id in completed_rows:
+            completed_days_by_client.setdefault(client_id, set()).add(workout_day_id)
+
     for appointment in appointments:
-        plan = appointment.client.active_plan()
-        appointment.completion_day = next_uncompleted_workout_day(plan, appointment.client) if plan else None
+        plan = plans_by_client.get(appointment.client_id)
+        completed_day_ids = completed_days_by_client.get(appointment.client_id, set())
+        appointment.completion_day = None
+        if plan:
+            for day in plan.days.all():
+                if day.id not in completed_day_ids:
+                    appointment.completion_day = day
+                    break
     return appointments
 
 

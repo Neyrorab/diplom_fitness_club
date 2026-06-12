@@ -12,7 +12,7 @@ WEIGHT_FORECAST_STEP_DAYS = 7
 
 
 def weight_forecast_readiness(client):
-    records = list(client.progress_records.order_by("record_date", "id").only("record_date", "weight"))
+    records = list(client.progress_records.order_by("record_date", "id").only("id", "client_id", "record_date", "weight"))
     count = len(records)
     span_days = (records[-1].record_date - records[0].record_date).days if count >= 2 else 0
     reasons = []

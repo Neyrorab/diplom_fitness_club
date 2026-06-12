@@ -84,18 +84,54 @@ class ClientProfile(models.Model):
         return self.full_name
 
     def current_membership(self):
+        if hasattr(self, "_current_membership_cache"):
+            return self._current_membership_cache
         today = timezone.localdate()
-        return self.memberships.filter(start_date__lte=today).order_by("-end_date", "-created_at").first()
+        prefetched = getattr(self, "_prefetched_objects_cache", {}).get("memberships")
+        if prefetched is None:
+            membership = self.memberships.filter(start_date__lte=today).order_by("-end_date", "-created_at").first()
+        else:
+            memberships = [item for item in prefetched if item.start_date <= today]
+            membership = max(memberships, key=lambda item: (item.end_date, item.created_at), default=None)
+        if membership is not None:
+            self._current_membership_cache = membership
+        return membership
 
     def active_plan(self):
-        return self.workout_plans.filter(status=PlanStatus.ACTIVE, is_template=False).order_by("-start_date").first()
+        if hasattr(self, "_active_plan_cache"):
+            return self._active_plan_cache
+        prefetched = getattr(self, "_prefetched_objects_cache", {}).get("workout_plans")
+        if prefetched is None:
+            plan = self.workout_plans.filter(status=PlanStatus.ACTIVE, is_template=False).order_by("-start_date").first()
+        else:
+            plans = [item for item in prefetched if item.status == PlanStatus.ACTIVE and not item.is_template]
+            plan = max(plans, key=lambda item: (item.start_date, item.created_at), default=None)
+        if plan is not None:
+            self._active_plan_cache = plan
+        return plan
 
     def last_workout(self):
-        return self.completed_workouts.order_by("-completed_at").first()
+        if hasattr(self, "_last_workout_cache"):
+            return self._last_workout_cache
+        prefetched = getattr(self, "_prefetched_objects_cache", {}).get("completed_workouts")
+        if prefetched is None:
+            workout = self.completed_workouts.order_by("-completed_at").first()
+        else:
+            workout = max(prefetched, key=lambda item: item.completed_at, default=None)
+        if workout is not None:
+            self._last_workout_cache = workout
+        return workout
 
     def last_workout_at(self):
+        if hasattr(self, "last_activity_at"):
+            return self.last_activity_at
+        if hasattr(self, "_last_workout_at_cache"):
+            return self._last_workout_at_cache
         workout = self.last_workout()
-        return workout.completed_at if workout else None
+        if workout:
+            self._last_workout_at_cache = workout.completed_at
+            return self._last_workout_at_cache
+        return None
 
     def is_low_activity(self):
         last = self.last_workout_at()
@@ -571,15 +607,19 @@ class WorkoutPlan(models.Model):
         super().save(*args, **kwargs)
 
     def completion_percent(self):
+        if hasattr(self, "_completion_percent_cache"):
+            return self._completion_percent_cache
         total_days = self.days.count()
         if total_days == 0:
-            return 0
+            self._completion_percent_cache = 0
+            return self._completion_percent_cache
         completed_days = CompletedWorkout.objects.filter(
-            client=self.client,
+            client_id=self.client_id,
             workout_day__workout_plan=self,
             exercises__is_completed=True,
         ).values("workout_day_id").distinct().count()
-        return round(completed_days / total_days * 100)
+        self._completion_percent_cache = round(completed_days / total_days * 100)
+        return self._completion_percent_cache
 
 
 class WorkoutDay(models.Model):

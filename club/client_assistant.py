@@ -14,9 +14,9 @@ CLIENT_AI_RECOMMENDATIONS_LIMIT = 3
 CLIENT_AI_SIGNALS_LIMIT = 4
 
 
-def build_client_ai_payload(client):
+def build_client_ai_payload(client, recommendations=None):
     today = timezone.localdate()
-    recommendations = build_client_recommendations(client)
+    recommendations = recommendations or build_client_recommendations(client)
     membership = client.current_membership()
     plan = client.active_plan()
     target = current_nutrition_target(client, today)

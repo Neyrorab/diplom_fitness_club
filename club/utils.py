@@ -8,6 +8,8 @@ from django.utils import timezone
 
 from .models import ClientProfile, Membership, MembershipStatus, Role, TrainerProfile
 
+_CACHE_MISSING = object()
+
 
 def bootstrap_roles():
     for role_name, _ in Role.CHOICES:
@@ -17,13 +19,24 @@ def bootstrap_roles():
 def user_role(user):
     if not user.is_authenticated:
         return None
-    if user.is_superuser or user.groups.filter(name=Role.ADMIN).exists():
-        return Role.ADMIN
-    if user.groups.filter(name=Role.TRAINER).exists():
-        return Role.TRAINER
-    if user.groups.filter(name=Role.CLIENT).exists():
-        return Role.CLIENT
-    return None
+    cached_role = getattr(user, "_club_role_cache", _CACHE_MISSING)
+    if cached_role is not _CACHE_MISSING:
+        return cached_role
+
+    if user.is_superuser:
+        role = Role.ADMIN
+    else:
+        group_names = set(user.groups.values_list("name", flat=True))
+        if Role.ADMIN in group_names:
+            role = Role.ADMIN
+        elif Role.TRAINER in group_names:
+            role = Role.TRAINER
+        elif Role.CLIENT in group_names:
+            role = Role.CLIENT
+        else:
+            role = None
+    user._club_role_cache = role
+    return role
 
 
 def is_admin(user):
@@ -41,13 +54,23 @@ def is_client(user):
 def trainer_profile_for(user):
     if not is_trainer(user):
         return None
-    return getattr(user, "trainer_profile", None)
+    cached_profile = getattr(user, "_club_trainer_profile_cache", _CACHE_MISSING)
+    if cached_profile is not _CACHE_MISSING:
+        return cached_profile
+    profile = getattr(user, "trainer_profile", None)
+    user._club_trainer_profile_cache = profile
+    return profile
 
 
 def client_profile_for(user):
     if not is_client(user):
         return None
-    return getattr(user, "client_profile", None)
+    cached_profile = getattr(user, "_club_client_profile_cache", _CACHE_MISSING)
+    if cached_profile is not _CACHE_MISSING:
+        return cached_profile
+    profile = getattr(user, "client_profile", None)
+    user._club_client_profile_cache = profile
+    return profile
 
 
 def clients_available_for(user):
