@@ -1998,7 +1998,11 @@ def management_ai_model_tier_for_model(provider, model):
 
 
 def management_ai_provider_options():
-    return [{"value": value, "label": label} for value, label in AI_PROVIDER_LABELS.items()]
+    return [
+        {"value": value, "label": label}
+        for value, label in AI_PROVIDER_LABELS.items()
+        if value != "zai"
+    ]
 
 
 def management_ai_payload(metrics, business_kpis, goal_rows, trainer_rows, risk_rows, activity_chart):
