@@ -114,9 +114,10 @@ WSGI_APPLICATION = 'fitness_club.wsgi.application'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_SSL_REQUIRE = env_bool("DATABASE_SSL_REQUIRE", not DEBUG)
 if DATABASE_URL:
     DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=not DEBUG),
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=DATABASE_SSL_REQUIRE),
     }
 else:
     DATABASES = {
