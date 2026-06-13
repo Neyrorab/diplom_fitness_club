@@ -171,8 +171,8 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
     SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", True)
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", True)
+    CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", True)
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 LOGIN_URL = 'login'
