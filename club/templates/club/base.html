@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}ИС Фитнес-клуб{% endblock %}</title>
-    <link rel="stylesheet" href="{% static 'club/styles.css' %}?v=20260527-modern">
+    <link rel="stylesheet" href="{% static 'club/styles.css' %}?v=20260613-nav-tweaks">
 </head>
 <body>
     <div class="app-shell">
@@ -70,6 +70,14 @@
                         </span>
                         <span>Клиенты</span>
                     </a>
+                    {% if is_admin_role %}
+                        <a class="nav-trainers{% if request.resolver_match.url_name == 'trainers_list' %} is-active{% endif %}" href="{% url 'trainers_list' %}">
+                            <span class="nav-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path d="M12 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M5.5 19c.9-3.6 3-5.4 6.5-5.4s5.6 1.8 6.5 5.4"/><path d="m17.5 5.2.6 1.2 1.3.2-.9.9.2 1.3-1.2-.6-1.2.6.2-1.3-.9-.9 1.3-.2z"/></svg>
+                            </span>
+                            <span>Тренеры</span>
+                        </a>
+                    {% endif %}
                     <a class="nav-exercises{% if request.resolver_match.url_name == 'exercises_list' %} is-active{% endif %}" href="{% url 'exercises_list' %}">
                         <span class="nav-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path d="M6 7v10"/><path d="M18 7v10"/><path d="M3.5 9v6"/><path d="M20.5 9v6"/><path d="M7 12h10"/></svg>
@@ -95,12 +103,6 @@
                             <svg viewBox="0 0 24 24"><path d="M5 19V9"/><path d="M12 19V5"/><path d="M19 19v-7"/><path d="M3.5 19.5h17"/></svg>
                         </span>
                         <span>Дашборды</span>
-                    </a>
-                    <a class="nav-trainers{% if request.resolver_match.url_name == 'trainers_list' %} is-active{% endif %}" href="{% url 'trainers_list' %}">
-                        <span class="nav-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M12 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path d="M5.5 19c.9-3.6 3-5.4 6.5-5.4s5.6 1.8 6.5 5.4"/><path d="m17.5 5.2.6 1.2 1.3.2-.9.9.2 1.3-1.2-.6-1.2.6.2-1.3-.9-.9 1.3-.2z"/></svg>
-                        </span>
-                        <span>Тренеры</span>
                     </a>
                 {% endif %}
                 {% if is_client_role %}
