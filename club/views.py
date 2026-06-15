@@ -424,7 +424,7 @@ def client_edit(request, pk):
     client = get_client_for_user(request.user, pk)
     if not can_manage_client(request.user, client):
         raise PermissionDenied("Недостаточно прав для редактирования клиента.")
-    form = ClientEditForm(request.POST or None, instance=client)
+    form = ClientEditForm(request.POST or None, instance=client, allow_contact_fields=is_admin(request.user))
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Карточка клиента обновлена.")

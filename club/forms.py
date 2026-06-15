@@ -126,15 +126,24 @@ class ClientEditForm(StyledFormMixin, forms.ModelForm):
         ]
         widgets = {"birth_date": DateInput(), "health_limitations": forms.Textarea(attrs={"rows": 3})}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, allow_contact_fields=True, **kwargs):
+        self.allow_contact_fields = allow_contact_fields
         super().__init__(*args, **kwargs)
+        if not allow_contact_fields:
+            self.fields.pop("phone", None)
+            self.fields.pop("email", None)
+            return
         self.fields["email"].initial = self.instance.user.email if self.instance.pk else ""
 
     def save(self, commit=True):
         instance = super().save(commit)
-        instance.user.email = self.cleaned_data.get("email", "")
+        if "email" in self.fields:
+            instance.user.email = self.cleaned_data.get("email", "")
         instance.user.first_name = instance.full_name
-        instance.user.save(update_fields=["email", "first_name"])
+        update_fields = ["first_name"]
+        if "email" in self.fields:
+            update_fields.append("email")
+        instance.user.save(update_fields=update_fields)
         return instance
 
 
